@@ -64,4 +64,16 @@ print(float(1))  # convert int to float, result is 1.0
 print(str(1))  # convert int to string, result is "1"
 print(bool(1))  # convert int to boolean, result is True
 print(bool(0))  # convert int to boolean, result is False
-print()
+print(float("1.5"))  # convert string to float, result is 1.5
+print(int("1"))  # convert string to int, result is 1
+print(str(True))  # convert boolean to string, result is "True"
+print(str(False))  # convert boolean to string, result is "False"
+
+print("start input")
+# input (input()is a funtion that allows the user to input data)
+# (the text inside the () is the prompt that will be displayed to the user)
+a = input("Enter some text: ")
+print("end input")
+print(int(a) + 10)
+print(type(a))
+# (Proves that input() returns a string, even if the user inputs a number)

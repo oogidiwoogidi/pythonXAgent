@@ -1,0 +1,8 @@
+# Game Requirements
+
+pygame>=2.0.0
+
+# Optional development dependencies
+# pylint>=2.0.0
+# black>=21.0.0
+# pytest>=6.0.0

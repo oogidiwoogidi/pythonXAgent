@@ -1,7 +1,7 @@
 # try except (exception handiling structure)
 # (error handling structure)
 try:  # (try to execute code that may cause an error)
-    n = int("input a number: ")  # Convert input to integer
+    n = int(input("input a number: "))  # Convert input to integer
 except:  # (execute when an error is caught)
     print("you should input a number")
 

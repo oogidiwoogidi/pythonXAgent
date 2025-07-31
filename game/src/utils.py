@@ -113,7 +113,17 @@ def break_into_pieces(surface, x, y, size, color):
         pygame.draw.rect(surface, color, (piece_x, piece_y, piece_size, piece_size))
 
 
-def draw_button(surface, text, x, y, width, height):
+def draw_button(
+    surface,
+    text,
+    x,
+    y,
+    width,
+    height,
+    button_color=LIGHT_GRAY,
+    text_color=BLACK,
+    border_color=BLACK,
+):
     """
     Draw a button and return its rectangle for collision detection.
 
@@ -124,16 +134,19 @@ def draw_button(surface, text, x, y, width, height):
         y (int): Y coordinate
         width (int): Button width
         height (int): Button height
+        button_color (tuple): Background color of the button
+        text_color (tuple): Color of the text
+        border_color (tuple): Color of the border
 
     Returns:
         pygame.Rect: Button rectangle
     """
     button_rect = pygame.Rect(x, y, width, height)
-    pygame.draw.rect(surface, LIGHT_GRAY, button_rect)
-    pygame.draw.rect(surface, BLACK, button_rect, 2)
+    pygame.draw.rect(surface, button_color, button_rect)
+    pygame.draw.rect(surface, border_color, button_rect, 2)
 
     font_btn = pygame.font.SysFont(None, UI_BUTTON_FONT_SIZE)
-    text_surface = font_btn.render(text, True, BLACK)
+    text_surface = font_btn.render(text, True, text_color)
     text_x = x + (width - text_surface.get_width()) // 2
     text_y = y + (height - text_surface.get_height()) // 2
     surface.blit(text_surface, (text_x, text_y))

@@ -10,6 +10,7 @@ WINDOW_WIDTH = 700  # Set to requested size
 WINDOW_HEIGHT = 500  # Set to requested size
 WINDOW_TITLE = "2D Platform Shooter"
 FPS = 60
+FULLSCREEN_ENABLED = False  # Default to windowed mode
 
 # === Player Configuration ===
 PLAYER_SIZE = 40

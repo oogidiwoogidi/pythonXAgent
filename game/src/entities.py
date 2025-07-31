@@ -282,8 +282,8 @@ class Enemy(Entity):
         enemy_speed = difficulty_config["enemy_speed"]
         distance_x = abs(player.x - self.x)
 
-        # Only move if player is more than 8 blocks away
-        if distance_x > 8 * BLOCK_SIZE:
+        # Only move if player is more than 3 blocks away
+        if distance_x > 3 * BLOCK_SIZE:
             if player.x > self.x:
                 self.x += enemy_speed
             elif player.x < self.x:

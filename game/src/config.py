@@ -6,8 +6,8 @@ Centralizing constants makes the game easier to maintain and modify.
 """
 
 # === Window Configuration ===
-WINDOW_WIDTH = 900
-WINDOW_HEIGHT = 600
+WINDOW_WIDTH = 700  # Set to requested size
+WINDOW_HEIGHT = 500  # Set to requested size
 WINDOW_TITLE = "2D Platform Shooter"
 FPS = 60
 
@@ -50,7 +50,7 @@ GRAVITY = 1
 JUMP_STRENGTH = 15
 
 # === Platform Configuration ===
-PLATFORM_COLOR = (128, 128, 128)  # Gray
+PLATFORM_COLOR = (128, 128, 128)  # Grey
 PLATFORM_MIN_WIDTH = 80
 PLATFORM_MAX_WIDTH = 160
 PLATFORM_HEIGHT = 20
@@ -68,13 +68,7 @@ PLAYER2_BULLET_DAMAGE = PLAYER2_MAX_HEALTH // 30
 
 # === Weapon Configuration ===
 WEAPON_RIFLE = "rifle"
-WEAPON_SHOTGUN = "shotgun"
-
 RIFLE_COOLDOWN_FRAMES = 6
-SHOTGUN_COOLDOWN_FRAMES = 18
-SHOTGUN_MAGAZINE_SIZE = 2
-SHOTGUN_BULLETS_PER_SHOT = 12
-
 MAGAZINE_SIZE = 15
 RELOAD_FRAMES = 180
 
@@ -129,3 +123,6 @@ ORANGE = (255, 140, 0)
 GOLD = (255, 215, 0)
 DARK_RED = (200, 0, 0)
 LIGHT_GREEN = (0, 200, 0)
+
+# === Sound Effects ===
+# Gunshot sounds removed

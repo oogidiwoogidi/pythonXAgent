@@ -7,6 +7,7 @@ Player, Enemy, and Bullet classes with their respective behaviors.
 
 import pygame
 import random
+import os
 from config import *
 
 
@@ -57,7 +58,6 @@ class Player(Entity):
         self.reloading = False
         self.reload_timer = 0
         self.rifle_cooldown = 0
-        self.shotgun_cooldown = 0
 
         # Knockback system
         self.knockback_timer = 0
@@ -70,18 +70,13 @@ class Player(Entity):
         if self.reloading:
             self.reload_timer += 1
             if self.reload_timer >= RELOAD_FRAMES:
-                if self.weapon == WEAPON_SHOTGUN:
-                    self.magazine = SHOTGUN_MAGAZINE_SIZE
-                else:
-                    self.magazine = MAGAZINE_SIZE
+                self.magazine = MAGAZINE_SIZE
                 self.reloading = False
                 self.reload_timer = 0
 
         # Handle weapon cooldowns
         if self.rifle_cooldown > 0:
             self.rifle_cooldown -= 1
-        if self.shotgun_cooldown > 0:
-            self.shotgun_cooldown -= 1
 
         # Handle knockback
         if self.knockback_timer > 0:
@@ -112,8 +107,7 @@ class Player(Entity):
         """Handle player movement based on input keys."""
         if self.player_id == 1:
             # Player 1 controls (WASD)
-            if keys[pygame.K_w]:
-                self.y -= self.speed
+            # Only allow left/right/down movement; jumping is handled by jump() method
             if keys[pygame.K_s]:
                 self.y += self.speed
             if keys[pygame.K_a]:
@@ -137,28 +131,30 @@ class Player(Entity):
         self.x = max(0, min(self.x, WINDOW_WIDTH - self.size))
 
     def _apply_gravity_and_platforms(self, platforms):
-        """Apply gravity and handle platform collisions."""
+        """Apply gravity and handle platform collisions. Prevent landing glitch."""
         landed = False
         new_y = self.y + self.velocity_y
         temp_rect = pygame.Rect(self.x, new_y, self.size, self.size)
 
         for platform in platforms:
             if temp_rect.colliderect(platform) and self.velocity_y >= 0:
-                new_y = platform.top - self.size
+                # Snap player exactly on top of platform
+                self.y = platform.top - self.size
                 self.velocity_y = 0
                 landed = True
                 break
 
-        if new_y + self.size >= WINDOW_HEIGHT:
-            new_y = WINDOW_HEIGHT - self.size
+        if not landed and new_y + self.size >= WINDOW_HEIGHT:
+            # Snap player exactly on ground
+            self.y = WINDOW_HEIGHT - self.size
             self.velocity_y = 0
             landed = True
 
-        self.y = new_y
-        if landed:
-            self.is_jumping = False
-        else:
+        if not landed:
+            self.y = new_y
             self.velocity_y += GRAVITY
+        else:
+            self.is_jumping = False
 
     def jump(self):
         """Make the player jump if not already jumping."""
@@ -167,7 +163,7 @@ class Player(Entity):
             self.is_jumping = True
 
     def shoot(self):
-        """Shoot a bullet based on current weapon."""
+        """Shoot a bullet based on the current weapon."""
         bullets = []
 
         if self.weapon == WEAPON_RIFLE:
@@ -192,41 +188,12 @@ class Player(Entity):
                     self.reloading = True
                     self.reload_timer = 0
 
-        elif self.weapon == WEAPON_SHOTGUN:
-            if not self.reloading and self.magazine > 0 and self.shotgun_cooldown == 0:
-                direction = 1 if self.facing_right else -1
-                # Shotgun fires multiple bullets in a spread
-                for spread in range(-9, 10, 2):
-                    bullet = Bullet(
-                        self.x + self.size // 2,
-                        self.y + self.size // 2 + spread,
-                        direction
-                        * (
-                            PLAYER_BULLET_SPEED
-                            if self.player_id == 1
-                            else PLAYER2_BULLET_SPEED
-                        ),
-                        self.player_id,
-                        is_shotgun=True,
-                    )
-                    bullets.append(bullet)
-
-                self.magazine -= 1
-                self.shotgun_cooldown = SHOTGUN_COOLDOWN_FRAMES
-
-                if self.magazine == 0:
-                    self.reloading = True
-                    self.reload_timer = 0
-
         return bullets
 
-    def switch_weapon(self, weapon_type):
-        """Switch to a different weapon type."""
-        self.weapon = weapon_type
-        if weapon_type == WEAPON_SHOTGUN:
-            self.magazine = SHOTGUN_MAGAZINE_SIZE
-        else:
-            self.magazine = MAGAZINE_SIZE
+    def switch_weapon(self, key):
+        """Switch to rifle only (shotgun removed)."""
+        if key == pygame.K_1 or key == pygame.K_KP1:
+            self.weapon = WEAPON_RIFLE
 
     def take_damage(self, damage, bullet_direction):
         """Take damage and apply knockback."""
@@ -242,6 +209,24 @@ class Player(Entity):
     def is_alive(self):
         """Check if the player is still alive."""
         return self.health > 0
+
+    def draw(self, surface):
+        """Draw the player block split into two colored halves indicating shooting direction."""
+        half_size = self.size // 2
+        # Determine colors for each half
+        if self.facing_right:
+            left_color = GRAY
+            right_color = GREEN
+        else:
+            left_color = RED
+            right_color = GRAY
+
+        # Draw left half
+        pygame.draw.rect(surface, left_color, (self.x, self.y, half_size, self.size))
+        # Draw right half
+        pygame.draw.rect(
+            surface, right_color, (self.x + half_size, self.y, half_size, self.size)
+        )
 
 
 class Enemy(Entity):
@@ -351,6 +336,12 @@ class Enemy(Entity):
         """Check if the enemy is still alive."""
         return self.health > 0
 
+    def shoot_at_player(self, player):
+        """Shoot at the player."""
+        if self.shoot_timer <= 0:
+            # Create bullet towards player
+            direction = 1 if player.x > self.x else -1
+
 
 class Bullet:
     """Bullet projectile class."""
@@ -384,6 +375,26 @@ class Bullet:
 
     def update(self):
         """Update bullet position."""
+        self.x += self.dx
+        self.rect.x = self.x
+
+    def draw(self, surface):
+        """Draw the bullet on the given surface."""
+        pygame.draw.rect(surface, self.color, (self.x, self.y, self.width, self.height))
+
+    def is_off_screen(self):
+        """Check if bullet is off screen."""
+        return self.x < 0 or self.x > WINDOW_WIDTH
+        self.x += self.dx
+        self.rect.x = self.x
+
+    def draw(self, surface):
+        """Draw the bullet on the given surface."""
+        pygame.draw.rect(surface, self.color, (self.x, self.y, self.width, self.height))
+
+    def is_off_screen(self):
+        """Check if bullet is off screen."""
+        return self.x < 0 or self.x > WINDOW_WIDTH
         self.x += self.dx
         self.rect.x = self.x
 

@@ -7,6 +7,9 @@ such as health bar rendering, platform generation, and UI elements.
 
 import pygame
 import random
+import array
+import math
+import os
 from config import *
 
 

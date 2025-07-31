@@ -83,37 +83,17 @@ class MenuManager:
             )
 
             # Difficulty buttons
-            easy_rect = draw_button(
+            difficulties = ["Easy", "Medium", "Hard", "Master"]
+            button_width = 160
+            button_height = 60
+            button_spacing = 32
+            buttons = self.draw_difficulty_menu(
                 self.screen,
-                "Easy",
-                (WINDOW_WIDTH - 440) // 2,
-                WINDOW_HEIGHT // 2 - 20,
-                100,
-                32,
-            )
-            medium_rect = draw_button(
-                self.screen,
-                "Medium",
-                (WINDOW_WIDTH - 120) // 2,
-                WINDOW_HEIGHT // 2 - 20,
-                100,
-                32,
-            )
-            hard_rect = draw_button(
-                self.screen,
-                "Hard",
-                (WINDOW_WIDTH + 200) // 2,
-                WINDOW_HEIGHT // 2 - 20,
-                100,
-                32,
-            )
-            master_rect = draw_button(
-                self.screen,
-                "Master",
-                (WINDOW_WIDTH + 520) // 2,
-                WINDOW_HEIGHT // 2 - 20,
-                100,
-                32,
+                font_diff,
+                difficulties,
+                button_width,
+                button_height,
+                button_spacing,
             )
 
             pygame.display.flip()
@@ -125,19 +105,39 @@ class MenuManager:
 
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     mouse_pos = pygame.mouse.get_pos()
-
-                    if easy_rect.collidepoint(mouse_pos):
-                        return "Easy"
-                    if medium_rect.collidepoint(mouse_pos):
-                        return "Medium"
-                    if hard_rect.collidepoint(mouse_pos):
-                        return "Hard"
-                    if master_rect.collidepoint(mouse_pos):
-                        return "Master"
+                    for button_rect, difficulty in buttons:
+                        if button_rect.collidepoint(mouse_pos):
+                            return difficulty
 
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE:
                         return None
+
+    def draw_difficulty_menu(
+        self, screen, font, difficulties, button_width, button_height, button_spacing
+    ):
+        """
+        Draws the difficulty selection menu, centering the buttons horizontally.
+        """
+        screen_width = screen.get_width()
+        screen_height = screen.get_height()
+        num_buttons = len(difficulties)
+        total_width = num_buttons * button_width + (num_buttons - 1) * button_spacing
+        start_x = (screen_width - total_width) // 2
+        y = screen_height // 2 - button_height // 2
+
+        buttons = []
+        for i, difficulty in enumerate(difficulties):
+            x = start_x + i * (button_width + button_spacing)
+            rect = pygame.Rect(x, y, button_width, button_height)
+            buttons.append((rect, difficulty))
+            # Draw button background
+            pygame.draw.rect(screen, (180, 180, 180), rect)
+            # Draw button label
+            label = font.render(difficulty, True, (0, 0, 0))
+            label_rect = label.get_rect(center=rect.center)
+            screen.blit(label, label_rect)
+        return buttons
 
     def show_game_over(self, winner_title):
         """
@@ -194,6 +194,13 @@ class MenuManager:
                     if restart_rect.collidepoint(mouse_pos):
                         return True
                     if quit_rect.collidepoint(mouse_pos):
+                        return False
+
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_r:
+                        return True
+                    if event.key == pygame.K_ESCAPE or event.key == pygame.K_q:
+                        return False
                         return False
 
                 if event.type == pygame.KEYDOWN:

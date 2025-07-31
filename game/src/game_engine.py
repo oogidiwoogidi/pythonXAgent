@@ -7,6 +7,7 @@ collision detection, and rendering.
 
 import pygame
 import random
+import os
 from config import *
 from entities import Player, Enemy, Bullet
 from utils import (
@@ -25,9 +26,17 @@ class GameEngine:
     def __init__(self):
         """Initialize the game engine."""
         pygame.init()
+        pygame.mixer.init()
         self.screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
         pygame.display.set_caption(WINDOW_TITLE)
         self.clock = pygame.time.Clock()
+
+        # Sound manager
+        from sound_manager import SoundManager
+
+        self.sound_manager = SoundManager(
+            os.path.join(os.path.dirname(__file__), "../assets")
+        )
 
         # Game state
         self.running = True
@@ -40,6 +49,7 @@ class GameEngine:
         self.player2 = None
         self.enemy = None
         self.bullets = []
+        # Removed: self.grenades = []
 
         # Game systems
         self.menu_manager = MenuManager(self.screen)
@@ -125,35 +135,36 @@ class GameEngine:
                     # Weapon switching
                     if event.key == pygame.K_1:
                         self.player1.switch_weapon(WEAPON_RIFLE)
-                    if event.key == pygame.K_2:
-                        self.player1.switch_weapon(WEAPON_SHOTGUN)
-
-                    if self.two_player_mode:
-                        if event.key == pygame.K_KP1:
+                        if self.two_player_mode and self.player2:
                             self.player2.switch_weapon(WEAPON_RIFLE)
-                        if event.key == pygame.K_KP2:
-                            self.player2.switch_weapon(WEAPON_SHOTGUN)
 
                     # Jumping
-                    if event.key == pygame.K_SPACE and self.player1.is_alive():
-                        self.player1.jump()
-
-                    if (
-                        self.two_player_mode
-                        and event.key == pygame.K_UP
-                        and self.player2.is_alive()
-                    ):
-                        self.player2.jump()
+                    if self.two_player_mode:
+                        if event.key == pygame.K_w and self.player1.is_alive():
+                            self.player1.jump()
+                            self.sound_manager.play("jump")
+                        if event.key == pygame.K_UP and self.player2.is_alive():
+                            self.player2.jump()
+                            self.sound_manager.play("jump")
+                    else:
+                        if event.key == pygame.K_SPACE and self.player1.is_alive():
+                            self.player1.jump()
+                            self.sound_manager.play("jump")
 
                     # Shooting (keyboard)
                     if self.two_player_mode:
                         if event.key == pygame.K_e and self.player1.is_alive():
                             new_bullets = self.player1.shoot()
                             self.bullets.extend(new_bullets)
+                            self.sound_manager.play("shoot")
 
                         if event.key == pygame.K_KP0 and self.player2.is_alive():
                             new_bullets = self.player2.shoot()
                             self.bullets.extend(new_bullets)
+                            self.sound_manager.play("shoot")
+
+                    # Grenade throw
+                    # Removed grenade throw logic for 'Q'
 
                 # Shooting (mouse for single player)
                 if not self.two_player_mode and event.type == pygame.MOUSEBUTTONDOWN:
@@ -163,6 +174,7 @@ class GameEngine:
                         self.player1.facing_right = mouse_x > self.player1.x
                         new_bullets = self.player1.shoot()
                         self.bullets.extend(new_bullets)
+                        self.sound_manager.play("shoot")
 
             # Update entities
             keys = pygame.key.get_pressed()
@@ -200,6 +212,9 @@ class GameEngine:
                 if bullet.is_off_screen():
                     self.bullets.remove(bullet)
 
+            # Update grenades
+            # Removed grenade update and explosion logic
+
             # Handle collisions
             self._handle_collisions()
 
@@ -215,6 +230,7 @@ class GameEngine:
 
         # Show game over screen if needed
         if winner_title:
+            self.sound_manager.play("game_over")
             restart_clicked = self.menu_manager.show_game_over(winner_title)
             if not restart_clicked:
                 self.running = False
@@ -231,6 +247,7 @@ class GameEngine:
                     self.player1.take_damage(bullet.damage, bullet.dx)
                     self.bullets.remove(bullet)
                     bullet_hit = True
+                    self.sound_manager.play("damage")
 
             # Player 1 bullets vs Enemy (single player mode)
             elif (
@@ -240,16 +257,10 @@ class GameEngine:
                 and self.enemy.is_alive()
             ):
                 if bullet.rect.colliderect(self.enemy.rect):
-                    # Shotgun range check
-                    if bullet.is_shotgun:
-                        if abs(bullet.x - self.enemy.x) <= 5 * BLOCK_SIZE:
-                            self.enemy.take_damage(bullet.damage, bullet.dx)
-                            self.bullets.remove(bullet)
-                            bullet_hit = True
-                    else:
-                        self.enemy.take_damage(bullet.damage, bullet.dx)
-                        self.bullets.remove(bullet)
-                        bullet_hit = True
+                    self.enemy.take_damage(bullet.damage, bullet.dx)
+                    self.bullets.remove(bullet)
+                    bullet_hit = True
+                    self.sound_manager.play("damage")
 
             # Player 1 bullets vs Player 2 (two player mode)
             elif (
@@ -259,16 +270,10 @@ class GameEngine:
                 and self.player2.is_alive()
             ):
                 if bullet.rect.colliderect(self.player2.rect):
-                    # Shotgun range check
-                    if bullet.is_shotgun:
-                        if abs(bullet.x - self.player2.x) <= 5 * BLOCK_SIZE:
-                            self.player2.take_damage(bullet.damage, bullet.dx)
-                            self.bullets.remove(bullet)
-                            bullet_hit = True
-                    else:
-                        self.player2.take_damage(bullet.damage, bullet.dx)
-                        self.bullets.remove(bullet)
-                        bullet_hit = True
+                    self.player2.take_damage(bullet.damage, bullet.dx)
+                    self.bullets.remove(bullet)
+                    bullet_hit = True
+                    self.sound_manager.play("damage")
 
             # Player 2 bullets vs Player 1 (two player mode)
             elif (
@@ -277,16 +282,10 @@ class GameEngine:
                 and self.player1.is_alive()
             ):
                 if bullet.rect.colliderect(self.player1.rect):
-                    # Shotgun range check
-                    if bullet.is_shotgun:
-                        if abs(bullet.x - self.player1.x) <= 5 * BLOCK_SIZE:
-                            self.player1.take_damage(bullet.damage, bullet.dx)
-                            self.bullets.remove(bullet)
-                            bullet_hit = True
-                    else:
-                        self.player1.take_damage(bullet.damage, bullet.dx)
-                        self.bullets.remove(bullet)
-                        bullet_hit = True
+                    self.player1.take_damage(bullet.damage, bullet.dx)
+                    self.bullets.remove(bullet)
+                    bullet_hit = True
+                    self.sound_manager.play("damage")
 
     def _render(self):
         """Render all game objects."""
@@ -348,6 +347,9 @@ class GameEngine:
         for bullet in self.bullets:
             bullet.draw(self.screen)
 
+        # Draw grenades
+        # Removed grenade drawing logic
+
         # Draw UI
         self._draw_ui()
 
@@ -397,6 +399,27 @@ class GameEngine:
         if self.player1:
             draw_weapon_info(self.screen, self.player1, 0, 0)
 
+        if self.two_player_mode and self.player2:
+            draw_weapon_info(self.screen, self.player2, 0, 0)
+
+    def _check_game_over(self):
+        """
+        Check for game over conditions.
+
+        Returns:
+            str: Winner title or empty string if game continues
+        """
+        if not self.player1.is_alive():
+            if self.two_player_mode:
+                return "Player 2"
+            else:
+                return "NPC"
+        elif self.two_player_mode and self.player2 and not self.player2.is_alive():
+            return "Player 1"
+        elif not self.two_player_mode and self.enemy and not self.enemy.is_alive():
+            return "Player"
+
+        return ""
         if self.two_player_mode and self.player2:
             draw_weapon_info(self.screen, self.player2, 0, 0)
 

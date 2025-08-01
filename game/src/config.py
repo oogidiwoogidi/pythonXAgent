@@ -6,8 +6,8 @@ Centralizing constants makes the game easier to maintain and modify.
 """
 
 # === Window Configuration ===
-WINDOW_WIDTH = 700  # Set to requested size
-WINDOW_HEIGHT = 500  # Set to requested size
+WINDOW_WIDTH = 1000  # Increased for better game mode selection layout
+WINDOW_HEIGHT = 700  # Increased for better game mode selection layout
 WINDOW_TITLE = "2D Platform Shooter"
 FPS = 60
 FULLSCREEN_ENABLED = False  # Default to windowed mode

@@ -1,13 +1,14 @@
 """
 Game Engine
 
-Main game engine that handles the game loop, entity management,
-collision detection, and rendering.
+Enhanced Star Wars game engine with Force powers, lightsaber combat,
+legendary characters, and epic environments.
 """
 
 import pygame
 import random
 import os
+import math
 from config import *
 from entities import Player, Enemy, Bullet
 from utils import (
@@ -22,12 +23,25 @@ from visual_effects import particle_system, screen_effects, EnhancedRenderer
 from sprite_system import sprite_manager, animation_manager
 from enhanced_ui import background_manager, enhanced_ui
 
+# Import Star Wars systems
+try:
+    from force_powers import force_manager
+    from lightsaber_combat import lightsaber_combat
+    from legendary_characters import LEGENDARY_CHARACTERS, apply_character_profile
+    from star_wars_environments import EnvironmentManager
+    from game_modes import create_game_mode_manager
+
+    STAR_WARS_ENABLED = True
+except ImportError as e:
+    print(f"Star Wars systems not available: {e}")
+    STAR_WARS_ENABLED = False
+
 
 class GameEngine:
     """Main game engine class that manages the entire game."""
 
     def __init__(self):
-        """Initialize the game engine."""
+        """Initialize the enhanced Star Wars game engine."""
         pygame.init()
         pygame.mixer.init()
 
@@ -42,7 +56,7 @@ class GameEngine:
             self.screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
         else:
             self.screen = pygame.display.set_mode(self.original_size)
-        pygame.display.set_caption(WINDOW_TITLE)
+        pygame.display.set_caption("STAR WARS: ULTIMATE BATTLE")
         self.clock = pygame.time.Clock()
 
         # Calculate scaling and positioning for fullscreen
@@ -59,6 +73,7 @@ class GameEngine:
         self.running = True
         self.two_player_mode = False
         self.difficulty = "Medium"
+        self.current_game_mode = "classic"
         self.platforms = []
 
         # Entities
@@ -79,22 +94,46 @@ class GameEngine:
         self.player2_exploded = False
         self.enemy_exploded = False
 
+        # Star Wars systems
+        if STAR_WARS_ENABLED:
+            self.environment_manager = EnvironmentManager()
+            self.current_environment = "death_star"
+            self.force_manager = force_manager
+            self.lightsaber_combat = lightsaber_combat
+            self.game_mode_manager = create_game_mode_manager(self)
+
     def run(self):
         """Main game loop with enhanced menu system and Star Wars character selection."""
         while self.running:
             # Reset game state before showing menu
             self._reset_game_state()
 
-            # Show start menu and get game mode
+            # Show start menu and get game mode (player count selection)
             result = self.menu_manager.show_start_and_difficulty_menu()
 
             if result is None:
                 continue  # User quit, restart menu
 
-            self.two_player_mode, self.difficulty = result
+            self.two_player_mode, _ = result  # Difficulty will be handled later
 
-            # Set default difficulty for two-player mode (not used but needed for consistency)
-            if self.two_player_mode and self.difficulty is None:
+            # Game Mode Selection (now comes first)
+            if STAR_WARS_ENABLED and hasattr(self, "game_mode_manager"):
+                selected_mode = self.menu_manager.show_game_mode_selection()
+                if selected_mode is None:
+                    continue  # User cancelled, return to menu
+                self.current_game_mode = selected_mode
+                self.game_mode_manager.set_mode(selected_mode)
+            else:
+                self.current_game_mode = "classic"
+
+            # Difficulty Selection (only for single player, after game mode)
+            if not self.two_player_mode:
+                difficulty = self.menu_manager._show_difficulty_selection()
+                if difficulty is None:
+                    continue  # User cancelled, return to menu
+                self.difficulty = difficulty
+            else:
+                # Set default difficulty for two-player mode
                 self.difficulty = "Medium"
 
             # Character selection based on game mode
@@ -222,7 +261,7 @@ class GameEngine:
             )
 
     def _initialize_game(self):
-        """Initialize game entities and state with character selections."""
+        """Initialize game entities and state with character selections and game mode."""
         # Generate platforms
         self.platforms = generate_random_platforms()
 
@@ -257,6 +296,16 @@ class GameEngine:
                 WINDOW_HEIGHT // 2 - ENEMY_SIZE // 2,
                 ai_character,
             )
+
+        # Apply game mode restrictions and bonuses
+        if STAR_WARS_ENABLED and hasattr(self, "game_mode_manager"):
+            # Apply mode-specific restrictions to all entities
+            if self.player1:
+                self.game_mode_manager.apply_mode_restrictions(self.player1)
+            if self.player2:
+                self.game_mode_manager.apply_mode_restrictions(self.player2)
+            if self.enemy:
+                self.game_mode_manager.apply_mode_restrictions(self.enemy)
 
         # Reset game state
         self.bullets = []
@@ -314,6 +363,129 @@ class GameEngine:
                                 20,
                             )
 
+                    # Force Powers (Star Wars Mode)
+                    if STAR_WARS_ENABLED:
+                        # Force Push - Q key
+                        if event.key == pygame.K_q and self.player1.is_alive():
+                            mouse_x, mouse_y = pygame.mouse.get_pos()
+                            targets = []
+                            if self.two_player_mode and self.player2:
+                                targets.append(self.player2)
+                            elif self.enemy:
+                                targets.append(self.enemy)
+
+                            if self.force_manager.use_power(
+                                "force_push", self.player1, mouse_x, mouse_y, targets
+                            ):
+                                enhanced_ui.add_floating_text(
+                                    self.player1.x,
+                                    self.player1.y - 40,
+                                    "FORCE PUSH!",
+                                    BLUE,
+                                    24,
+                                )
+
+                        # Force Lightning - E key (in two-player mode, different from shooting)
+                        if event.key == pygame.K_t and self.player1.is_alive():
+                            mouse_x, mouse_y = pygame.mouse.get_pos()
+                            targets = []
+                            if self.two_player_mode and self.player2:
+                                targets.append(self.player2)
+                            elif self.enemy:
+                                targets.append(self.enemy)
+
+                            if self.force_manager.use_power(
+                                "force_lightning",
+                                self.player1,
+                                mouse_x,
+                                mouse_y,
+                                targets,
+                            ):
+                                enhanced_ui.add_floating_text(
+                                    self.player1.x,
+                                    self.player1.y - 40,
+                                    "FORCE LIGHTNING!",
+                                    (128, 0, 128),
+                                    24,
+                                )
+
+                        # Lightsaber Throw - G key
+                        if event.key == pygame.K_g and self.player1.is_alive():
+                            mouse_x, mouse_y = pygame.mouse.get_pos()
+                            targets = []
+                            if self.two_player_mode and self.player2:
+                                targets.append(self.player2)
+                            elif self.enemy:
+                                targets.append(self.enemy)
+
+                            if self.force_manager.use_power(
+                                "lightsaber_throw",
+                                self.player1,
+                                mouse_x,
+                                mouse_y,
+                                targets,
+                            ):
+                                enhanced_ui.add_floating_text(
+                                    self.player1.x,
+                                    self.player1.y - 40,
+                                    "LIGHTSABER THROW!",
+                                    (0, 255, 255),
+                                    24,
+                                )
+
+                        # Force Heal - H key
+                        if event.key == pygame.K_h and self.player1.is_alive():
+                            if self.force_manager.use_power(
+                                "force_heal",
+                                self.player1,
+                                self.player1.x,
+                                self.player1.y,
+                                [self.player1],
+                            ):
+                                enhanced_ui.add_floating_text(
+                                    self.player1.x,
+                                    self.player1.y - 40,
+                                    "FORCE HEAL!",
+                                    GREEN,
+                                    24,
+                                )
+
+                        # Lightsaber Attack - F key
+                        if event.key == pygame.K_f and self.player1.is_alive():
+                            mouse_x, mouse_y = pygame.mouse.get_pos()
+                            if self.lightsaber_combat.start_attack(
+                                self.player1, mouse_x, mouse_y
+                            ):
+                                enhanced_ui.add_floating_text(
+                                    self.player1.x,
+                                    self.player1.y - 40,
+                                    "LIGHTSABER STRIKE!",
+                                    RED,
+                                    24,
+                                )
+
+                        # Environment Switching - Number keys 2-5
+                        if event.key == pygame.K_2:
+                            self.current_environment = "death_star"
+                            enhanced_ui.add_floating_text(
+                                WINDOW_WIDTH // 2, 50, "DEATH STAR", WHITE, 32
+                            )
+                        elif event.key == pygame.K_3:
+                            self.current_environment = "tatooine"
+                            enhanced_ui.add_floating_text(
+                                WINDOW_WIDTH // 2, 50, "TATOOINE", (255, 255, 0), 32
+                            )
+                        elif event.key == pygame.K_4:
+                            self.current_environment = "endor"
+                            enhanced_ui.add_floating_text(
+                                WINDOW_WIDTH // 2, 50, "ENDOR", GREEN, 32
+                            )
+                        elif event.key == pygame.K_5:
+                            self.current_environment = "hoth"
+                            enhanced_ui.add_floating_text(
+                                WINDOW_WIDTH // 2, 50, "HOTH", (0, 255, 255), 32
+                            )
+
                     # Jumping with dust effects
                     if self.two_player_mode:
                         if event.key == pygame.K_w and self.player1.is_alive():
@@ -347,8 +519,6 @@ class GameEngine:
                                 self.bullets.extend(new_bullets)
                                 # Add muzzle flash
                                 mouse_x, mouse_y = pygame.mouse.get_pos()
-                                import math
-
                                 angle = math.atan2(
                                     mouse_y - self.player1.y, mouse_x - self.player1.x
                                 )
@@ -357,12 +527,8 @@ class GameEngine:
                                     self.player1.y + self.player1.size // 2,
                                     angle,
                                 )
-                                screen_effects.add_screen_shake(
-                                    8, 15
-                                )  # Much more intense shake
-                                screen_effects.add_screen_flash(
-                                    (255, 255, 255), 120, 6
-                                )  # Brighter, longer flash
+                                screen_effects.add_screen_shake(8, 15)
+                                screen_effects.add_screen_flash((255, 255, 255), 120, 6)
                                 self.sound_manager.play("shoot")
 
                         if event.key == pygame.K_KP0 and self.player2.is_alive():
@@ -375,12 +541,8 @@ class GameEngine:
                                     self.player2.y + self.player2.size // 2,
                                     0,  # Facing right by default
                                 )
-                                screen_effects.add_screen_shake(
-                                    8, 15
-                                )  # Much more intense shake
-                                screen_effects.add_screen_flash(
-                                    (255, 255, 255), 120, 6
-                                )  # Brighter, longer flash
+                                screen_effects.add_screen_shake(8, 15)
+                                screen_effects.add_screen_flash((255, 255, 255), 120, 6)
                                 self.sound_manager.play("shoot")
 
                 # Shooting (mouse for single player)
@@ -444,8 +606,6 @@ class GameEngine:
                         self.bullets.append(enemy_bullet)
 
                         # Add muzzle flash for enemy shooting
-                        import math
-
                         dx = self.player1.x - self.enemy.x
                         dy = self.player1.y - self.enemy.y
                         angle = math.atan2(dy, dx)
@@ -455,12 +615,8 @@ class GameEngine:
                             self.enemy.y + self.enemy.size // 2,
                             angle,
                         )
-                        screen_effects.add_screen_shake(
-                            6, 10
-                        )  # Intense but slightly less than players
-                        screen_effects.add_screen_flash(
-                            (255, 255, 200), 80, 4
-                        )  # Enemy flash
+                        screen_effects.add_screen_shake(6, 10)
+                        screen_effects.add_screen_flash((255, 255, 200), 80, 4)
                         self.sound_manager.play("shoot")
 
             # Update bullets
@@ -468,6 +624,24 @@ class GameEngine:
                 bullet.update()
                 if bullet.is_off_screen():
                     self.bullets.remove(bullet)
+
+            # Update Star Wars systems
+            if STAR_WARS_ENABLED:
+                self.force_manager.update()
+                self.lightsaber_combat.update()
+                if hasattr(self, "environment_manager"):
+                    self.environment_manager.update()
+
+                # Update game mode manager
+                if hasattr(self, "game_mode_manager"):
+                    game_state = {
+                        "player1": self.player1,
+                        "player2": self.player2,
+                        "enemy": self.enemy,
+                        "bullets": self.bullets,
+                        "platforms": self.platforms,
+                    }
+                    self.game_mode_manager.update(game_state)
 
             # Handle collisions
             self._handle_collisions()
@@ -482,7 +656,7 @@ class GameEngine:
             # Render everything
             self._render()
 
-            # Check for game over
+            # Check for game over (including mode-specific win conditions)
             winner_title = self._check_game_over()
             if winner_title:
                 game_over = True
@@ -581,17 +755,23 @@ class GameEngine:
                     self.sound_manager.play("damage")
 
     def _render(self):
+        """Render all game objects with enhanced Star Wars visuals and proper fullscreen scaling."""
         # Update all entity animations before rendering
-        from src.sprite_system import animation_manager
-
         animation_manager.update_animations()
-        """Render all game objects with enhanced visuals and proper fullscreen scaling."""
+
         # Apply screen shake offset
         shake_x, shake_y = screen_effects.get_screen_offset()
 
         # Clear and draw to the game surface (original resolution)
         self.game_surface.fill(WHITE)
-        background_manager.draw_space_background(self.game_surface)
+
+        # Draw Star Wars environment background
+        if STAR_WARS_ENABLED and hasattr(self, "environment_manager"):
+            self.environment_manager.draw_environment(
+                self.game_surface, self.current_environment
+            )
+        else:
+            background_manager.draw_space_background(self.game_surface)
 
         # Create a temporary surface for shake effect
         if shake_x != 0 or shake_y != 0:
@@ -609,6 +789,11 @@ class GameEngine:
             )
             render_surface.blit(scaled_sprite, (platform.x, platform.y))
 
+        # Draw Star Wars Force power effects
+        if STAR_WARS_ENABLED:
+            self.force_manager.draw(render_surface)
+            self.lightsaber_combat.draw(render_surface)
+
         # Draw entities with sprites
         if self.player1:
             self.player1.draw(render_surface)
@@ -624,7 +809,7 @@ class GameEngine:
                     )
                     screen_effects.add_screen_shake(8, 15)
                     enhanced_ui.add_floating_text(
-                        self.player1.x, self.player1.y - 20, "PLAYER DOWN!", RED, 32
+                        self.player1.x, self.player1.y - 20, "JEDI DOWN!", RED, 32
                     )
                     break_into_pieces(
                         render_surface,
@@ -649,7 +834,7 @@ class GameEngine:
                     )
                     screen_effects.add_screen_shake(8, 15)
                     enhanced_ui.add_floating_text(
-                        self.player2.x, self.player2.y - 20, "PLAYER 2 DOWN!", BLUE, 32
+                        self.player2.x, self.player2.y - 20, "SITH DOWN!", BLUE, 32
                     )
                     break_into_pieces(
                         render_surface,
@@ -732,7 +917,9 @@ class GameEngine:
         pygame.display.flip()
 
     def _draw_ui(self):
-        """Draw user interface elements with enhanced visuals."""
+        """Draw enhanced Star Wars user interface elements."""
+        font = pygame.font.Font(None, 24)
+
         # Enhanced health bars
         if self.two_player_mode:
             EnhancedRenderer.draw_health_bar_enhanced(
@@ -744,10 +931,29 @@ class GameEngine:
                 self.player1.health,
                 self.player1.max_health,
             )
-            # Player 1 label
-            font = pygame.font.Font(None, 24)
-            label = font.render("Player 1", True, WHITE)
+            # Player 1 label with character name
+            if hasattr(self.player1, "character_name"):
+                label_text = f"{self.player1.character_name}"
+            else:
+                label_text = "Player 1"
+            label = font.render(label_text, True, WHITE)
             self.game_surface.blit(label, (10, 35))
+
+            # Force energy bar for Player 1
+            if STAR_WARS_ENABLED and hasattr(self.player1, "force_energy"):
+                EnhancedRenderer.draw_health_bar_enhanced(
+                    self.game_surface,
+                    10,
+                    50,
+                    200,
+                    15,
+                    self.player1.force_energy,
+                    self.player1.max_force_energy,
+                    bar_color=BLUE,
+                    bg_color=(30, 30, 100),
+                )
+                force_label = font.render("Force Energy", True, BLUE)
+                self.game_surface.blit(force_label, (10, 70))
 
             if self.player2:
                 EnhancedRenderer.draw_health_bar_enhanced(
@@ -759,9 +965,29 @@ class GameEngine:
                     self.player2.health,
                     self.player2.max_health,
                 )
-                # Player 2 label
-                label = font.render("Player 2", True, WHITE)
+                # Player 2 label with character name
+                if hasattr(self.player2, "character_name"):
+                    label_text = f"{self.player2.character_name}"
+                else:
+                    label_text = "Player 2"
+                label = font.render(label_text, True, WHITE)
                 self.game_surface.blit(label, (WINDOW_WIDTH - 210, 35))
+
+                # Force energy bar for Player 2
+                if STAR_WARS_ENABLED and hasattr(self.player2, "force_energy"):
+                    EnhancedRenderer.draw_health_bar_enhanced(
+                        self.game_surface,
+                        WINDOW_WIDTH - 210,
+                        50,
+                        200,
+                        15,
+                        self.player2.force_energy,
+                        self.player2.max_force_energy,
+                        bar_color=RED,
+                        bg_color=(100, 30, 30),
+                    )
+                    force_label = font.render("Force Energy", True, RED)
+                    self.game_surface.blit(force_label, (WINDOW_WIDTH - 210, 70))
 
             # Enhanced weapon HUD for both players
             if self.player1.is_alive():
@@ -771,7 +997,7 @@ class GameEngine:
                     self.player1.magazine,
                     MAGAZINE_SIZE,
                     10,
-                    60,
+                    90,
                 )
 
             if self.player2 and self.player2.is_alive():
@@ -781,7 +1007,7 @@ class GameEngine:
                     self.player2.magazine,
                     MAGAZINE_SIZE,
                     WINDOW_WIDTH - 160,
-                    60,
+                    90,
                 )
         else:
             # Single player mode
@@ -794,10 +1020,29 @@ class GameEngine:
                 self.player1.health,
                 self.player1.max_health,
             )
-            # Player label
-            font = pygame.font.Font(None, 24)
-            label = font.render("Player", True, WHITE)
+            # Player label with character name
+            if hasattr(self.player1, "character_name"):
+                label_text = f"{self.player1.character_name}"
+            else:
+                label_text = "Player"
+            label = font.render(label_text, True, WHITE)
             self.game_surface.blit(label, (10, 35))
+
+            # Force energy bar for Player
+            if STAR_WARS_ENABLED and hasattr(self.player1, "force_energy"):
+                EnhancedRenderer.draw_health_bar_enhanced(
+                    self.game_surface,
+                    10,
+                    50,
+                    200,
+                    15,
+                    self.player1.force_energy,
+                    self.player1.max_force_energy,
+                    bar_color=BLUE,
+                    bg_color=(30, 30, 100),
+                )
+                force_label = font.render("Force Energy", True, BLUE)
+                self.game_surface.blit(force_label, (10, 70))
 
             if self.enemy and self.enemy.is_alive():
                 EnhancedRenderer.draw_health_bar_enhanced(
@@ -809,9 +1054,29 @@ class GameEngine:
                     self.enemy.health,
                     self.enemy.max_health,
                 )
-                # Enemy label
-                label = font.render("Enemy", True, WHITE)
+                # Enemy label with character name
+                if hasattr(self.enemy, "character_name"):
+                    label_text = f"{self.enemy.character_name}"
+                else:
+                    label_text = "Enemy"
+                label = font.render(label_text, True, WHITE)
                 self.game_surface.blit(label, (WINDOW_WIDTH - 210, 35))
+
+                # Force energy bar for Enemy
+                if STAR_WARS_ENABLED and hasattr(self.enemy, "force_energy"):
+                    EnhancedRenderer.draw_health_bar_enhanced(
+                        self.game_surface,
+                        WINDOW_WIDTH - 210,
+                        50,
+                        200,
+                        15,
+                        self.enemy.force_energy,
+                        self.enemy.max_force_energy,
+                        bar_color=RED,
+                        bg_color=(100, 30, 30),
+                    )
+                    force_label = font.render("Force Energy", True, RED)
+                    self.game_surface.blit(force_label, (WINDOW_WIDTH - 210, 70))
 
             # Enhanced weapon HUD
             if self.player1.is_alive():
@@ -821,7 +1086,7 @@ class GameEngine:
                     self.player1.magazine,
                     MAGAZINE_SIZE,
                     10,
-                    60,
+                    90,
                 )
 
         # Draw crosshair for mouse aiming (single player mode)
@@ -841,6 +1106,35 @@ class GameEngine:
             else:
                 enhanced_ui.draw_enhanced_crosshair(self.game_surface, mouse_x, mouse_y)
 
+        # Star Wars control hints
+        if STAR_WARS_ENABLED:
+            hints_font = pygame.font.Font(None, 20)
+            hints = [
+                "Q: Force Push",
+                "T: Force Lightning",
+                "G: Lightsaber Throw",
+                "H: Force Heal",
+                "F: Lightsaber Attack",
+                "2-5: Change Environment",
+            ]
+
+            for i, hint in enumerate(hints):
+                hint_surface = hints_font.render(hint, True, WHITE)
+                self.game_surface.blit(
+                    hint_surface, (WINDOW_WIDTH - 200, WINDOW_HEIGHT - 150 + i * 20)
+                )
+
+        # Environment indicator
+        if STAR_WARS_ENABLED and hasattr(self, "current_environment"):
+            env_font = pygame.font.Font(None, 32)
+            env_name = self.current_environment.replace("_", " ").title()
+            env_surface = env_font.render(env_name, True, (255, 255, 0))
+            self.game_surface.blit(env_surface, (WINDOW_WIDTH // 2 - 100, 10))
+
+        # Game mode UI
+        if STAR_WARS_ENABLED and hasattr(self, "game_mode_manager"):
+            self.game_mode_manager.draw_mode_ui(self.game_surface)
+
         # Weapon info
         if self.player1:
             draw_weapon_info(self.game_surface, self.player1, 0, 0)
@@ -850,11 +1144,25 @@ class GameEngine:
 
     def _check_game_over(self):
         """
-        Check for game over conditions.
+        Check for game over conditions including mode-specific win conditions.
 
         Returns:
             str: Winner title or empty string if game continues
         """
+        # Check mode-specific win conditions first
+        if STAR_WARS_ENABLED and hasattr(self, "game_mode_manager"):
+            game_state = {
+                "player1": self.player1,
+                "player2": self.player2,
+                "enemy": self.enemy,
+                "bullets": self.bullets,
+                "platforms": self.platforms,
+            }
+            mode_winner = self.game_mode_manager.check_win_condition(game_state)
+            if mode_winner:
+                return mode_winner
+
+        # Standard win conditions
         if not self.player1.is_alive():
             if self.two_player_mode:
                 return "Player 2"

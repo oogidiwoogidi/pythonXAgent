@@ -2,12 +2,20 @@
 Game Menus
 
 This module handles all game menus including the start menu,
-difficulty selection, and game over screen.
+difficulty selection, game mode selection, and game over screen.
 """
 
 import pygame
 from config import *
 from utils import draw_button
+
+# Import game modes
+try:
+    from game_modes import create_game_mode_manager
+
+    GAME_MODES_ENABLED = True
+except ImportError:
+    GAME_MODES_ENABLED = False
 
 
 class MenuManager:
@@ -37,13 +45,14 @@ class MenuManager:
 
     def show_start_and_difficulty_menu(self):
         """
-        Show the enhanced start menu and difficulty selection.
+        Show the enhanced start menu and difficulty selection with keyboard navigation.
 
         Returns:
             tuple: (two_player_mode, difficulty)
         """
         # Clear any lingering events to prevent stuck state
         pygame.event.clear()
+        selected_option = 0  # 0 = Single Player, 1 = Two Player
 
         while True:
             self.screen.fill(WHITE)
@@ -64,25 +73,28 @@ class MenuManager:
                 subtitle_text, ((WINDOW_WIDTH - subtitle_text.get_width()) // 2, 90)
             )
 
-            # Draw start menu buttons with enhanced styling
+            # Draw start menu buttons with enhanced styling and selection highlighting
+            single_selected = selected_option == 0
+            two_player_selected = selected_option == 1
+
             start_button_rect = draw_button(
                 self.screen,
-                "Single Player",
-                (WINDOW_WIDTH - 160) // 2,
+                "Single Player" + (" ◄" if single_selected else ""),
+                (WINDOW_WIDTH - 200) // 2,
                 WINDOW_HEIGHT // 2 - 60,
-                160,
+                200,
                 40,
-                button_color=LIGHT_GREEN,
+                button_color=GOLD if single_selected else LIGHT_GREEN,
                 text_color=BLACK,
             )
             two_player_button_rect = draw_button(
                 self.screen,
-                "2 Player Mode",
-                (WINDOW_WIDTH - 160) // 2,
+                "2 Player Mode" + (" ◄" if two_player_selected else ""),
+                (WINDOW_WIDTH - 200) // 2,
                 WINDOW_HEIGHT // 2 + 10,
-                160,
+                200,
                 40,
-                button_color=LIGHT_GRAY,
+                button_color=GOLD if two_player_selected else LIGHT_GRAY,
                 text_color=BLACK,
             )
 
@@ -90,16 +102,16 @@ class MenuManager:
             instruction_font = pygame.font.SysFont(None, 20)
             instructions = [
                 "Controls:",
+                "Use W/S or Arrow Keys to navigate • Enter to select • F11 for fullscreen",
                 "Single Player: WASD + Space + Mouse",
                 "2 Player: WASD+E vs Arrows+Numpad0",
                 "Press R during game for quick rematch!",
-                "Press F11 for fullscreen toggle",
             ]
 
             for i, instruction in enumerate(instructions):
                 color = BLACK if i == 0 else GRAY
                 inst_text = instruction_font.render(instruction, True, color)
-                self.screen.blit(inst_text, (10, WINDOW_HEIGHT - 120 + i * 22))
+                self.screen.blit(inst_text, (10, WINDOW_HEIGHT - 130 + i * 22))
 
             # Use game engine's scaling display method
             if self.game_engine:
@@ -116,26 +128,41 @@ class MenuManager:
                     if event.key == pygame.K_F11 and self.game_engine:
                         # Toggle fullscreen from menu
                         self.game_engine.toggle_fullscreen()
+                    elif event.key in [pygame.K_w, pygame.K_UP]:
+                        selected_option = max(0, selected_option - 1)
+                    elif event.key in [pygame.K_s, pygame.K_DOWN]:
+                        selected_option = min(1, selected_option + 1)
+                    elif event.key in [pygame.K_RETURN, pygame.K_KP_ENTER]:
+                        if selected_option == 0:
+                            # Single player: go to game mode selection first
+                            return False, None
+                        elif selected_option == 1:
+                            # Two player: go to game mode selection first
+                            return True, None
 
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     mouse_pos = self._transform_mouse_pos(pygame.mouse.get_pos())
 
                     if start_button_rect.collidepoint(mouse_pos):
-                        # Show difficulty selection for single player
-                        difficulty = self._show_difficulty_selection()
-                        if difficulty:
-                            return False, difficulty
+                        selected_option = 0
+                        # Single player: go to game mode selection first
+                        return False, None
 
                     if two_player_button_rect.collidepoint(mouse_pos):
+                        selected_option = 1
+                        # Two player: go to game mode selection first
                         return True, None
 
     def _show_difficulty_selection(self):
         """
-        Show difficulty selection screen.
+        Show difficulty selection screen with keyboard navigation.
 
         Returns:
             str: Selected difficulty level or None if cancelled
         """
+        selected_difficulty = 0  # 0=Easy, 1=Medium, 2=Hard, 3=Master
+        difficulties = ["Easy", "Medium", "Hard", "Master"]
+
         while True:
             self.screen.fill(WHITE)
 
@@ -144,11 +171,20 @@ class MenuManager:
             diff_text = font_diff.render("Select Difficulty", True, BLACK)
             self.screen.blit(
                 diff_text,
-                ((WINDOW_WIDTH - diff_text.get_width()) // 2, WINDOW_HEIGHT // 2 - 60),
+                ((WINDOW_WIDTH - diff_text.get_width()) // 2, WINDOW_HEIGHT // 2 - 100),
+            )
+
+            # Instructions
+            inst_font = pygame.font.SysFont(None, 20)
+            inst_text = inst_font.render(
+                "Use W/S or Arrow Keys • Enter to confirm • Esc to go back", True, GRAY
+            )
+            self.screen.blit(
+                inst_text,
+                ((WINDOW_WIDTH - inst_text.get_width()) // 2, WINDOW_HEIGHT // 2 - 70),
             )
 
             # Difficulty buttons
-            difficulties = ["Easy", "Medium", "Hard", "Master"]
             button_width = 160
             button_height = 60
             button_spacing = 32
@@ -159,6 +195,7 @@ class MenuManager:
                 button_width,
                 button_height,
                 button_spacing,
+                selected_difficulty,
             )
 
             # Use game engine's scaling display method
@@ -172,21 +209,37 @@ class MenuManager:
                     pygame.quit()
                     exit()
 
-                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                    mouse_pos = self._transform_mouse_pos(pygame.mouse.get_pos())
-                    for button_rect, difficulty in buttons:
-                        if button_rect.collidepoint(mouse_pos):
-                            return difficulty
-
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE:
                         return None
+                    elif event.key in [pygame.K_w, pygame.K_UP]:
+                        selected_difficulty = max(0, selected_difficulty - 1)
+                    elif event.key in [pygame.K_s, pygame.K_DOWN]:
+                        selected_difficulty = min(
+                            len(difficulties) - 1, selected_difficulty + 1
+                        )
+                    elif event.key in [pygame.K_RETURN, pygame.K_KP_ENTER]:
+                        return difficulties[selected_difficulty]
+
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    mouse_pos = self._transform_mouse_pos(pygame.mouse.get_pos())
+                    for i, (button_rect, difficulty) in enumerate(buttons):
+                        if button_rect.collidepoint(mouse_pos):
+                            selected_difficulty = i
+                            return difficulty
 
     def draw_difficulty_menu(
-        self, screen, font, difficulties, button_width, button_height, button_spacing
+        self,
+        screen,
+        font,
+        difficulties,
+        button_width,
+        button_height,
+        button_spacing,
+        selected_index=0,
     ):
         """
-        Draws the difficulty selection menu, centering the buttons horizontally.
+        Draws the difficulty selection menu with keyboard navigation support.
         """
         screen_width = screen.get_width()
         screen_height = screen.get_height()
@@ -196,16 +249,43 @@ class MenuManager:
         y = screen_height // 2 - button_height // 2
 
         buttons = []
+        difficulty_colors = {
+            "Easy": (100, 255, 100),  # Light green
+            "Medium": (255, 255, 100),  # Yellow
+            "Hard": (255, 150, 100),  # Orange
+            "Master": (255, 100, 100),  # Red
+        }
+
         for i, difficulty in enumerate(difficulties):
             x = start_x + i * (button_width + button_spacing)
             rect = pygame.Rect(x, y, button_width, button_height)
             buttons.append((rect, difficulty))
+
+            # Determine button colors
+            if i == selected_index:
+                # Selected button
+                bg_color = GOLD
+                text_color = BLACK
+                border_width = 4
+                border_color = WHITE
+            else:
+                # Normal button with difficulty-based color
+                bg_color = difficulty_colors.get(difficulty, (180, 180, 180))
+                text_color = BLACK
+                border_width = 2
+                border_color = (100, 100, 100)
+
             # Draw button background
-            pygame.draw.rect(screen, (180, 180, 180), rect)
+            pygame.draw.rect(screen, bg_color, rect)
+            pygame.draw.rect(screen, border_color, rect, border_width)
+
             # Draw button label
-            label = font.render(difficulty, True, (0, 0, 0))
+            label = font.render(
+                difficulty + (" ◄" if i == selected_index else ""), True, text_color
+            )
             label_rect = label.get_rect(center=rect.center)
             screen.blit(label, label_rect)
+
         return buttons
 
     def show_single_player_character_selection(self):
@@ -358,7 +438,7 @@ class MenuManager:
 
     def show_character_selection(self, mode="single"):
         """
-        Display Star Wars character selection screen.
+        Display Star Wars character selection screen with enhanced keyboard navigation.
 
         Args:
             mode (str): 'single' for single player, 'two' for two player
@@ -375,7 +455,7 @@ class MenuManager:
 
         if mode == "single":
             # Single player mode - choose your character, AI gets opposite
-            selected_character = None
+            selected_character = 0  # 0 = Jedi, 1 = Sith
 
             while True:
                 for event in pygame.event.get():
@@ -384,12 +464,21 @@ class MenuManager:
                         return None
 
                     if event.type == pygame.KEYDOWN:
-                        # A key selects Jedi
-                        if event.key == pygame.K_a:
-                            return {"player1": "jedi", "ai": "sith"}
-                        # D key selects Sith
-                        elif event.key == pygame.K_d:
-                            return {"player1": "sith", "ai": "jedi"}
+                        # Escape to go back
+                        if event.key == pygame.K_ESCAPE:
+                            return None
+                        # A key or Left Arrow selects Jedi
+                        elif event.key in [pygame.K_a, pygame.K_LEFT]:
+                            selected_character = 0
+                        # D key or Right Arrow selects Sith
+                        elif event.key in [pygame.K_d, pygame.K_RIGHT]:
+                            selected_character = 1
+                        # Enter to confirm selection
+                        elif event.key in [pygame.K_RETURN, pygame.K_KP_ENTER]:
+                            if selected_character == 0:
+                                return {"player1": "jedi", "ai": "sith"}
+                            else:
+                                return {"player1": "sith", "ai": "jedi"}
 
                 self.screen.fill((20, 20, 40))  # Dark space background
 
@@ -413,6 +502,14 @@ class MenuManager:
 
                 # Jedi side (left)
                 jedi_x = WINDOW_WIDTH // 4
+                jedi_rect = pygame.Rect(jedi_x - 100, 180, 200, 180)
+
+                # Highlight selected character
+                if selected_character == 0:
+                    pygame.draw.rect(self.screen, (100, 150, 255), jedi_rect, 4)
+                else:
+                    pygame.draw.rect(self.screen, (50, 50, 50), jedi_rect, 2)
+
                 self.screen.blit(jedi_sprite, (jedi_x - 40, 200))
 
                 jedi_title = font_subtitle.render("JEDI", True, (100, 150, 255))
@@ -430,6 +527,14 @@ class MenuManager:
 
                 # Sith side (right)
                 sith_x = 3 * WINDOW_WIDTH // 4
+                sith_rect = pygame.Rect(sith_x - 100, 180, 200, 180)
+
+                # Highlight selected character
+                if selected_character == 1:
+                    pygame.draw.rect(self.screen, (255, 100, 100), sith_rect, 4)
+                else:
+                    pygame.draw.rect(self.screen, (50, 50, 50), sith_rect, 2)
+
                 self.screen.blit(sith_sprite, (sith_x - 40, 200))
 
                 sith_title = font_subtitle.render("SITH", True, (255, 100, 100))
@@ -447,7 +552,7 @@ class MenuManager:
 
                 # Instructions
                 instruction = font_instruction.render(
-                    "Press A for Jedi or D for Sith. AI will be your opponent.",
+                    "Use A/D or Arrow Keys to select • Enter to confirm • Esc to go back",
                     True,
                     (200, 200, 200),
                 )
@@ -458,7 +563,7 @@ class MenuManager:
 
                 # Key hints
                 key_hint = font_instruction.render(
-                    "A = Jedi (Blue Lightsaber)    D = Sith (Red Lightsaber)",
+                    "A/← = Jedi (Blue)    D/→ = Sith (Red)    Enter = Confirm",
                     True,
                     (255, 255, 100),
                 )
@@ -472,6 +577,7 @@ class MenuManager:
         else:  # Two player mode
             # Clear any lingering events to prevent stuck state
             pygame.event.clear()
+            selected_character = 0  # 0 = Jedi, 1 = Sith
 
             while True:
                 for event in pygame.event.get():
@@ -484,17 +590,16 @@ class MenuManager:
                         if event.key == pygame.K_ESCAPE:
                             return None
 
-                        # Player 1 uses WASD - automatically assigns opposite character to Player 2
-                        if event.key == pygame.K_a:  # Choose Jedi
-                            return {
-                                "player1": "jedi",
-                                "player2": "sith",
-                            }
-                        elif event.key == pygame.K_d:  # Choose Sith
-                            return {
-                                "player1": "sith",
-                                "player2": "jedi",
-                            }
+                        # Player 1 uses WASD/Arrow keys - automatically assigns opposite character to Player 2
+                        elif event.key in [pygame.K_a, pygame.K_LEFT]:  # Choose Jedi
+                            selected_character = 0
+                        elif event.key in [pygame.K_d, pygame.K_RIGHT]:  # Choose Sith
+                            selected_character = 1
+                        elif event.key in [pygame.K_RETURN, pygame.K_KP_ENTER]:
+                            if selected_character == 0:
+                                return {"player1": "jedi", "player2": "sith"}
+                            else:
+                                return {"player1": "sith", "player2": "jedi"}
 
                 self.screen.fill((20, 20, 40))  # Dark space background
 
@@ -518,6 +623,14 @@ class MenuManager:
 
                 # Jedi side (left)
                 jedi_x = WINDOW_WIDTH // 4
+                jedi_rect = pygame.Rect(jedi_x - 80, 160, 160, 140)
+
+                # Highlight selected character for Player 1
+                if selected_character == 0:
+                    pygame.draw.rect(self.screen, (100, 150, 255), jedi_rect, 4)
+                else:
+                    pygame.draw.rect(self.screen, (50, 50, 50), jedi_rect, 2)
+
                 self.screen.blit(jedi_sprite, (jedi_x - 30, 180))
 
                 jedi_title = font_subtitle.render("JEDI", True, (100, 150, 255))
@@ -526,6 +639,14 @@ class MenuManager:
 
                 # Sith side (right)
                 sith_x = 3 * WINDOW_WIDTH // 4
+                sith_rect = pygame.Rect(sith_x - 80, 160, 160, 140)
+
+                # Highlight selected character for Player 1
+                if selected_character == 1:
+                    pygame.draw.rect(self.screen, (255, 100, 100), sith_rect, 4)
+                else:
+                    pygame.draw.rect(self.screen, (50, 50, 50), sith_rect, 2)
+
                 self.screen.blit(sith_sprite, (sith_x - 30, 180))
 
                 sith_title = font_subtitle.render("SITH", True, (255, 100, 100))
@@ -534,7 +655,7 @@ class MenuManager:
 
                 # Player status indicators - simplified for automatic assignment
                 player1_text = font_subtitle.render(
-                    "Player 1: Choose with A (Jedi) or D (Sith)",
+                    "Player 1: Use A/D or Arrow Keys to choose",
                     True,
                     (255, 255, 0),
                 )
@@ -543,7 +664,7 @@ class MenuManager:
 
                 # Player 2 auto-assignment message
                 player2_text = font_subtitle.render(
-                    "Player 2: Will automatically get the opposite character",
+                    "Player 2: Gets the opposite character automatically",
                     True,
                     (200, 200, 200),
                 )
@@ -552,7 +673,7 @@ class MenuManager:
 
                 # Rules
                 rule_text = font_instruction.render(
-                    "Player 1 chooses, Player 2 gets the opposite automatically!",
+                    "A/← = Jedi  •  D/→ = Sith  •  Enter = Confirm  •  Esc = Back",
                     True,
                     (200, 200, 200),
                 )
@@ -566,6 +687,247 @@ class MenuManager:
                     self.game_engine._display_menu_with_scaling()
                 else:
                     pygame.display.flip()
+
+    def show_game_mode_selection(self):
+        """
+        Show game mode selection menu with keyboard navigation.
+
+        Returns:
+            str: Selected game mode key or None if cancelled
+        """
+        if not GAME_MODES_ENABLED:
+            return "classic"  # Default fallback
+
+        pygame.event.clear()
+        selected_index = 0
+
+        # Create temporary game mode manager to get mode info
+        temp_manager = (
+            create_game_mode_manager(self.game_engine) if self.game_engine else None
+        )
+        if not temp_manager:
+            return "classic"
+
+        modes = temp_manager.get_mode_list()
+        selected_mode = modes[0] if modes else "classic"
+
+        while True:
+            self.screen.fill(BLACK)
+
+            # Title
+            title_font = pygame.font.SysFont(None, 48)
+            title_text = title_font.render(
+                "🌟 SELECT GAME MODE 🌟", True, (255, 215, 0)
+            )
+            self.screen.blit(
+                title_text, ((WINDOW_WIDTH - title_text.get_width()) // 2, 30)
+            )
+
+            # Subtitle
+            subtitle_font = pygame.font.SysFont(None, 24)
+            subtitle_text = subtitle_font.render(
+                "Choose your battle style!", True, WHITE
+            )
+            self.screen.blit(
+                subtitle_text, ((WINDOW_WIDTH - subtitle_text.get_width()) // 2, 80)
+            )
+
+            # Draw mode buttons in a more spaced out layout for better readability
+            button_width = 480  # Increased width for more description space
+            button_height = 100  # Increased height for better readability
+            cols = 2
+            spacing_x = 40  # Increased horizontal spacing
+            spacing_y = 25  # Increased vertical spacing
+            start_x = (
+                WINDOW_WIDTH - (cols * button_width + (cols - 1) * spacing_x)
+            ) // 2
+            start_y = 120
+
+            mode_rects = {}
+
+            for i, mode_key in enumerate(modes):
+                row = i // cols
+                col = i % cols
+
+                x = start_x + col * (button_width + spacing_x)
+                y = start_y + row * (button_height + spacing_y)
+
+                mode_info = temp_manager.get_mode_info(mode_key)
+
+                # Button color based on selection (keyboard or mouse)
+                is_selected = (i == selected_index) or (mode_key == selected_mode)
+                if is_selected:
+                    button_color = mode_info["color"]
+                    text_color = BLACK
+                    border_width = 4
+                    support_color = (0, 150, 0)  # Dark green
+                else:
+                    button_color = (50, 50, 50)
+                    text_color = mode_info["color"]
+                    border_width = 2
+                    support_color = GREEN
+
+                # Draw button background
+                button_rect = pygame.Rect(x, y, button_width, button_height)
+                pygame.draw.rect(self.screen, button_color, button_rect)
+                pygame.draw.rect(self.screen, text_color, button_rect, border_width)
+
+                # Mode icon and name
+                font = pygame.font.SysFont(None, 24)  # Smaller font for better fit
+                icon_font = pygame.font.SysFont(None, 32)  # Smaller icon font
+
+                icon_text = icon_font.render(mode_info["icon"], True, text_color)
+                name_text = font.render(mode_info["name"], True, text_color)
+
+                # Description with better wrapping
+                desc_font = pygame.font.SysFont(None, 18)
+                desc_lines = self._wrap_text(
+                    mode_info["description"],
+                    desc_font,
+                    button_width - 30,  # More padding
+                )
+
+                # Better positioning for larger buttons
+                icon_x = x + 15  # Left-aligned
+                icon_y = y + 10
+
+                name_x = x + 50  # Next to icon
+                name_y = y + 15
+
+                self.screen.blit(icon_text, (icon_x, icon_y))
+                self.screen.blit(name_text, (name_x, name_y))
+
+                # Description lines with better spacing
+                desc_start_y = y + 45
+                for j, line in enumerate(desc_lines):
+                    line_text = desc_font.render(line, True, text_color)
+                    self.screen.blit(
+                        line_text, (x + 15, desc_start_y + j * 18)
+                    )  # Left-aligned with padding
+
+                # 2-Player support indicator (better positioned)
+                if mode_info.get("supports_two_player", False):
+                    support_font = pygame.font.SysFont(None, 16, bold=True)
+                    support_text = support_font.render(
+                        "✓ 2-Player Compatible", True, support_color
+                    )
+                    self.screen.blit(
+                        support_text, (x + button_width - 140, y + button_height - 20)
+                    )
+
+                mode_rects[mode_key] = button_rect
+
+            # Control buttons (adjusted for new layout)
+            confirm_rect = draw_button(
+                self.screen,
+                "⚔️ START BATTLE (Enter)",
+                WINDOW_WIDTH // 2 - 120,
+                WINDOW_HEIGHT - 80,  # Moved up slightly
+                240,
+                40,
+                button_color=GREEN,
+                text_color=BLACK,
+            )
+
+            back_rect = draw_button(
+                self.screen,
+                "← Back (Esc)",
+                20,
+                WINDOW_HEIGHT - 50,  # Moved up slightly
+                120,
+                30,
+                button_color=GRAY,
+                text_color=BLACK,
+            )
+
+            # Instructions
+            inst_font = pygame.font.SysFont(None, 20)
+            instructions = [
+                "Use WASD or Arrow Keys to navigate • Enter to confirm • Esc to go back",
+                "Each mode has unique rules and objectives",
+            ]
+
+            for i, inst in enumerate(instructions):
+                inst_text = inst_font.render(inst, True, WHITE)
+                self.screen.blit(inst_text, (20, 20 + i * 22))
+
+            # Display
+            if self.game_engine:
+                self.game_engine._display_menu_with_scaling()
+            else:
+                pygame.display.flip()
+
+            # Handle events
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    return None
+
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    mouse_pos = self._transform_mouse_pos(pygame.mouse.get_pos())
+
+                    # Check mode selection
+                    for i, mode_key in enumerate(modes):
+                        if mode_key in mode_rects and mode_rects[mode_key].collidepoint(
+                            mouse_pos
+                        ):
+                            selected_index = i
+                            selected_mode = mode_key
+                            break
+
+                    # Check control buttons
+                    if confirm_rect.collidepoint(mouse_pos):
+                        return selected_mode
+
+                    if back_rect.collidepoint(mouse_pos):
+                        return None
+
+                if event.type == pygame.KEYDOWN:
+                    if event.key in [pygame.K_ESCAPE]:
+                        return None
+                    elif event.key in [pygame.K_RETURN, pygame.K_KP_ENTER]:
+                        return selected_mode
+                    elif event.key in [pygame.K_w, pygame.K_UP]:
+                        # Move up (decrease row)
+                        if selected_index >= 2:  # 2 columns, so -2 moves up one row
+                            selected_index -= 2
+                            selected_mode = modes[selected_index]
+                    elif event.key in [pygame.K_s, pygame.K_DOWN]:
+                        # Move down (increase row)
+                        if selected_index + 2 < len(modes):
+                            selected_index += 2
+                            selected_mode = modes[selected_index]
+                    elif event.key in [pygame.K_a, pygame.K_LEFT]:
+                        # Move left
+                        if selected_index > 0:
+                            selected_index -= 1
+                            selected_mode = modes[selected_index]
+                    elif event.key in [pygame.K_d, pygame.K_RIGHT]:
+                        # Move right
+                        if selected_index + 1 < len(modes):
+                            selected_index += 1
+                            selected_mode = modes[selected_index]
+
+    def _wrap_text(self, text, font, max_width):
+        """Wrap text to fit within max_width."""
+        words = text.split(" ")
+        lines = []
+        current_line = []
+
+        for word in words:
+            test_line = " ".join(current_line + [word])
+            if font.size(test_line)[0] <= max_width:
+                current_line.append(word)
+            else:
+                if current_line:
+                    lines.append(" ".join(current_line))
+                    current_line = [word]
+                else:
+                    lines.append(word)  # Word too long, add anyway
+
+        if current_line:
+            lines.append(" ".join(current_line))
+
+        return lines
 
     def show_game_over(self, winner_title):
         """

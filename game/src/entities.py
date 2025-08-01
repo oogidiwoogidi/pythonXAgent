@@ -3,11 +3,13 @@ Entity Classes
 
 This module contains all the entity classes for the game including
 Player, Enemy, and Bullet classes with their respective behaviors.
+Enhanced with Force powers, lightsaber combat, and legendary characters.
 """
 
 import pygame
 import random
 import os
+import math
 from config import *
 
 
@@ -31,14 +33,30 @@ class Entity:
 
     def draw(self, surface):
         """Draw the entity on the given surface."""
-        pygame.draw.rect(surface, self.color, (self.x, self.y, self.size, self.size))
+        # Import sprite manager for enhanced character sprites
+        try:
+            from sprite_system import sprite_manager
+
+            if hasattr(self, "character_type"):
+                character_sprite = sprite_manager.get_character_sprite(
+                    self.character_type, self.size
+                )
+                surface.blit(character_sprite, (self.x, self.y))
+            else:
+                pygame.draw.rect(
+                    surface, self.color, (self.x, self.y, self.size, self.size)
+                )
+        except:
+            pygame.draw.rect(
+                surface, self.color, (self.x, self.y, self.size, self.size)
+            )
 
 
 class Player(Entity):
-    """Player entity with movement, jumping, and combat capabilities."""
+    """Enhanced Player entity with Force powers, lightsaber combat, and legendary character support."""
 
-    def __init__(self, x, y, player_id=1, character_type="soldier"):
-        """Initialize a player with character type (jedi, sith, or soldier)."""
+    def __init__(self, x, y, player_id=1, character_type="jedi"):
+        """Initialize a player with character type (jedi or sith)."""
         if player_id == 1:
             super().__init__(x, y, PLAYER_SIZE, PLAYER_COLOR)
             self.max_health = PLAYER_MAX_HEALTH
@@ -49,11 +67,28 @@ class Player(Entity):
             self.speed = PLAYER2_SPEED
 
         self.player_id = player_id
-        self.character_type = character_type  # 'jedi', 'sith', or 'soldier'
+        self.character_type = character_type  # 'jedi' or 'sith'
         self.health = self.max_health
         self.facing_right = True
 
-        # Weapon system
+        # Enhanced Force and combat systems
+        self.max_force_energy = 100
+        self.force_energy = self.max_force_energy
+        self.force_regen_rate = 1
+        self.force_power_bonus = 1.0
+
+        # Lightsaber combat
+        self.lightsaber_cooldown = 0
+        self.lightsaber_damage_bonus = 0
+        self.is_blocking = False
+        self.stunned = 0
+
+        # Legendary character support
+        self.character_name = "Unknown Warrior"
+        self.character_description = "A Force-sensitive warrior"
+        self.special_abilities = []
+
+        # Weapon system (enhanced for Star Wars)
         self.weapon = WEAPON_BLASTER
         self.magazine = MAGAZINE_SIZE
         self.reloading = False
@@ -66,7 +101,18 @@ class Player(Entity):
         self.knockback_dy = 0
 
     def update(self, keys, platforms):
-        """Update player state including movement, gravity, and weapons."""
+        """Update player state including movement, gravity, weapons, and Force powers."""
+        # Handle stunning
+        if self.stunned > 0:
+            self.stunned -= 1
+            return  # Skip other updates while stunned
+
+        # Force energy regeneration
+        if self.force_energy < self.max_force_energy:
+            self.force_energy = min(
+                self.max_force_energy, self.force_energy + self.force_regen_rate * 0.1
+            )
+
         # Handle reloading
         if self.reloading:
             self.reload_timer += 1
@@ -191,6 +237,110 @@ class Player(Entity):
 
         return bullets
 
+    def use_force_power(self, power_name, target_x, target_y, entities):
+        """Use a Force power."""
+        try:
+            from force_powers import force_manager
+
+            return force_manager.use_power(
+                power_name, self, target_x, target_y, entities
+            )
+        except ImportError:
+            return False
+
+    def lightsaber_attack(self, target_x, target_y):
+        """Perform a lightsaber attack."""
+        try:
+            from lightsaber_combat import lightsaber_combat
+
+            return lightsaber_combat.start_attack(self, target_x, target_y)
+        except ImportError:
+            return False
+
+    def lightsaber_block(self, direction):
+        """Start blocking with lightsaber."""
+        try:
+            from lightsaber_combat import lightsaber_combat
+
+            self.is_blocking = True
+            return lightsaber_combat.start_block(self, direction)
+        except ImportError:
+            return False
+
+    def stop_blocking(self):
+        """Stop blocking."""
+        self.is_blocking = False
+
+    def apply_legendary_character(self, character_key):
+        """Apply legendary character profile."""
+        try:
+            from legendary_characters import apply_character_profile
+
+            return apply_character_profile(self, character_key)
+        except ImportError:
+            return False
+
+    def draw(self, surface):
+        """Enhanced draw method with Force energy and status effects."""
+        # Draw character sprite
+        super().draw(surface)
+
+        # Draw Force energy bar above character
+        if hasattr(self, "force_energy"):
+            bar_width = 40
+            bar_height = 4
+            bar_x = self.x + (self.size - bar_width) // 2
+            bar_y = self.y - 15
+
+            # Background
+            pygame.draw.rect(
+                surface, (50, 50, 50), (bar_x, bar_y, bar_width, bar_height)
+            )
+
+            # Force energy
+            energy_width = int((self.force_energy / self.max_force_energy) * bar_width)
+            energy_color = (
+                (100, 150, 255) if self.character_type == "jedi" else (255, 100, 100)
+            )
+            pygame.draw.rect(
+                surface, energy_color, (bar_x, bar_y, energy_width, bar_height)
+            )
+
+        # Draw character name
+        if hasattr(self, "character_name"):
+            font = pygame.font.Font(None, 20)
+            name_text = font.render(self.character_name, True, WHITE)
+            name_x = self.x + (self.size - name_text.get_width()) // 2
+            name_y = self.y - 35
+            surface.blit(name_text, (name_x, name_y))
+
+        # Draw status effects
+        if hasattr(self, "stunned") and self.stunned > 0:
+            # Draw stun effect
+            for i in range(3):
+                angle = (pygame.time.get_ticks() + i * 120) * 0.01
+                star_x = self.x + self.size // 2 + math.cos(angle) * 20
+                star_y = self.y + self.size // 2 + math.sin(angle) * 20
+                pygame.draw.circle(
+                    surface, (255, 255, 0), (int(star_x), int(star_y)), 3
+                )
+
+        # Draw blocking effect
+        if hasattr(self, "is_blocking") and self.is_blocking:
+            # Draw defensive aura
+            center_x = self.x + self.size // 2
+            center_y = self.y + self.size // 2
+            for radius in range(30, 50, 5):
+                alpha = 100 - (radius - 30) * 10
+                temp_surf = pygame.Surface((radius * 2, radius * 2), pygame.SRCALPHA)
+                block_color = (
+                    (100, 150, 255, alpha)
+                    if self.character_type == "jedi"
+                    else (255, 100, 100, alpha)
+                )
+                pygame.draw.circle(temp_surf, block_color, (radius, radius), radius, 2)
+                surface.blit(temp_surf, (center_x - radius, center_y - radius))
+
     def switch_weapon(self, key):
         """Switch to blaster only (shotgun removed)."""
         if key == pygame.K_1 or key == pygame.K_KP1:
@@ -260,18 +410,37 @@ class Player(Entity):
 
 
 class Enemy(Entity):
-    """Enemy AI entity with movement, jumping, and shooting capabilities."""
+    """Enhanced Enemy AI entity with Force powers and intelligent combat."""
 
-    def __init__(self, x, y, character_type="soldier"):
+    def __init__(self, x, y, character_type="sith"):
         """Initialize an enemy with character type."""
         super().__init__(x, y, ENEMY_SIZE, ENEMY_COLOR)
         self.health = ENEMY_MAX_HEALTH
         self.max_health = ENEMY_MAX_HEALTH
         self.character_type = character_type  # 'jedi', 'sith', or 'soldier'
 
+        # Enhanced Force and combat systems
+        self.max_force_energy = 80
+        self.force_energy = self.max_force_energy
+        self.force_regen_rate = 0.8
+        self.force_power_bonus = 1.0
+
+        # Lightsaber combat
+        self.lightsaber_cooldown = 0
+        self.lightsaber_damage_bonus = 0
+        self.is_blocking = False
+        self.stunned = 0
+
+        # Legendary character support
+        self.character_name = "Dark Warrior"
+        self.character_description = "A powerful Force user"
+        self.special_abilities = []
+
         # AI behavior
         self.jump_timer = 0
         self.jump_interval = 120
+        self.force_power_timer = 0
+        self.combat_mode = "ranged"  # "ranged", "melee", "force"
 
         # Knockback system
         self.knockback_timer = 0
@@ -316,7 +485,18 @@ class Enemy(Entity):
                 surface.blit(frame, (self.x, self.y))
 
     def update(self, player, platforms, difficulty):
-        """Update enemy AI behavior."""
+        """Enhanced enemy AI behavior with Force powers and intelligent combat."""
+        # Handle stunning
+        if self.stunned > 0:
+            self.stunned -= 1
+            return
+
+        # Force energy regeneration
+        if self.force_energy < self.max_force_energy:
+            self.force_energy = min(
+                self.max_force_energy, self.force_energy + self.force_regen_rate * 0.1
+            )
+
         difficulty_config = DIFFICULTY_LEVELS[difficulty]
         self.jump_interval = difficulty_config["enemy_jump_interval"]
 
@@ -336,8 +516,8 @@ class Enemy(Entity):
 
             self.knockback_timer -= 1
         else:
-            # AI movement
-            self._ai_movement(player, difficulty_config)
+            # Enhanced AI with multiple combat modes
+            self._enhanced_ai_behavior(player, difficulty_config)
 
         # Apply gravity and platform collisions
         self._apply_gravity_and_platforms(platforms)
@@ -345,16 +525,97 @@ class Enemy(Entity):
         # Update collision rectangle
         self.update_rect()
 
-    def _ai_movement(self, player, difficulty_config):
-        """Handle AI movement toward player."""
+    def _enhanced_ai_behavior(self, player, difficulty_config):
+        """Enhanced AI with Force powers and tactical behavior."""
+        distance_to_player = math.sqrt(
+            (player.x - self.x) ** 2 + (player.y - self.y) ** 2
+        )
+
+        # Determine combat mode based on distance and Force energy
+        if distance_to_player < 80 and self.force_energy > 30:
+            self.combat_mode = "melee"
+        elif distance_to_player < 200 and self.force_energy > 50:
+            self.combat_mode = "force"
+        else:
+            self.combat_mode = "ranged"
+
+        # Execute behavior based on combat mode
+        if self.combat_mode == "melee":
+            self._melee_behavior(player, difficulty_config)
+        elif self.combat_mode == "force":
+            self._force_power_behavior(player)
+        else:
+            self._ranged_behavior(player, difficulty_config)
+
+    def _melee_behavior(self, player, difficulty_config):
+        """Melee combat behavior - move close and use lightsaber."""
+        enemy_speed = difficulty_config["enemy_speed"] * 1.5
+
+        # Move towards player aggressively
+        if player.x > self.x + 10:
+            self.x += enemy_speed
+        elif player.x < self.x - 10:
+            self.x -= enemy_speed
+
+        # Attempt lightsaber attack if close enough
+        if abs(player.x - self.x) < 60 and abs(player.y - self.y) < 60:
+            try:
+                from lightsaber_combat import lightsaber_combat
+
+                if not hasattr(self, "lightsaber_cooldown"):
+                    self.lightsaber_cooldown = 0
+                if self.lightsaber_cooldown <= 0:
+                    lightsaber_combat.start_attack(self, player.x, player.y)
+                    self.lightsaber_cooldown = 60
+            except ImportError:
+                pass
+
+    def _force_power_behavior(self, player):
+        """Force power behavior - use Force abilities."""
+        self.force_power_timer += 1
+
+        if self.force_power_timer > 120:  # Use Force power every 2 seconds
+            self.force_power_timer = 0
+
+            # Choose Force power based on character type
+            if self.character_type == "sith" and self.force_energy >= 40:
+                try:
+                    from force_powers import force_manager
+
+                    # Use Force Lightning
+                    force_manager.use_power(
+                        "force_lightning", self, player.x, player.y, [player]
+                    )
+                except ImportError:
+                    pass
+            elif self.character_type == "jedi" and self.force_energy >= 25:
+                try:
+                    from force_powers import force_manager
+
+                    # Use Force Push
+                    force_manager.use_power(
+                        "force_push", self, player.x, player.y, [player]
+                    )
+                except ImportError:
+                    pass
+
+    def _ranged_behavior(self, player, difficulty_config):
+        """Ranged combat behavior - maintain distance and shoot."""
         enemy_speed = difficulty_config["enemy_speed"]
         distance_x = abs(player.x - self.x)
 
-        # Only move if player is more than 3 blocks away
-        if distance_x > 3 * BLOCK_SIZE:
+        # Maintain optimal distance (not too close, not too far)
+        if distance_x < 150:
+            # Too close, back away
+            if player.x > self.x:
+                self.x -= enemy_speed
+            else:
+                self.x += enemy_speed
+        elif distance_x > 300:
+            # Too far, move closer
             if player.x > self.x:
                 self.x += enemy_speed
-            elif player.x < self.x:
+            else:
                 self.x -= enemy_speed
 
         # Constrain horizontally

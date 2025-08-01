@@ -483,6 +483,10 @@ class GameEngine:
                     self.sound_manager.play("damage")
 
     def _render(self):
+        # Update all entity animations before rendering
+        from src.sprite_system import animation_manager
+
+        animation_manager.update_animations()
         """Render all game objects with enhanced visuals and proper fullscreen scaling."""
         # Apply screen shake offset
         shake_x, shake_y = screen_effects.get_screen_offset()
@@ -509,8 +513,7 @@ class GameEngine:
 
         # Draw entities with sprites
         if self.player1:
-            player_sprite = sprite_manager.get_sprite("player")
-            render_surface.blit(player_sprite, (self.player1.x, self.player1.y))
+            self.player1.draw(render_surface)
             if not self.player1.is_alive():
                 draw_x_above(
                     render_surface, self.player1.x, self.player1.y, self.player1.size
@@ -535,8 +538,7 @@ class GameEngine:
                     self.player1_exploded = True
 
         if self.two_player_mode and self.player2:
-            player2_sprite = sprite_manager.get_sprite("player2")
-            render_surface.blit(player2_sprite, (self.player2.x, self.player2.y))
+            self.player2.draw(render_surface)
             if not self.player2.is_alive():
                 draw_x_above(
                     render_surface, self.player2.x, self.player2.y, self.player2.size
@@ -561,8 +563,7 @@ class GameEngine:
                     self.player2_exploded = True
 
         if not self.two_player_mode and self.enemy:
-            enemy_sprite = sprite_manager.get_sprite("enemy")
-            render_surface.blit(enemy_sprite, (self.enemy.x, self.enemy.y))
+            self.enemy.draw(render_surface)
             if not self.enemy.is_alive():
                 draw_x_above(
                     render_surface, self.enemy.x, self.enemy.y, self.enemy.size
@@ -592,10 +593,8 @@ class GameEngine:
             particle_system.add_bullet_trail(
                 bullet.x, bullet.y, bullet.dx, 0, bullet.color
             )
-
-            # Draw enhanced bullet sprite
-            bullet_sprite = sprite_manager.get_sprite("bullet")
-            render_surface.blit(bullet_sprite, (bullet.x - 2, bullet.y - 1))
+            # Draw bullet using its draw method (supports enhanced/animated sprites)
+            bullet.draw(render_surface)
 
         # Draw particle effects
         particle_system.draw(render_surface)

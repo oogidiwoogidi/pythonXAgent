@@ -211,25 +211,70 @@ class Player(Entity):
         return self.health > 0
 
     def draw(self, surface):
-        """Draw the player block split into two colored halves indicating shooting direction."""
-        half_size = self.size // 2
-        # Determine colors for each half
-        if self.facing_right:
-            left_color = GRAY
-            right_color = GREEN
-        else:
-            left_color = RED
-            right_color = GRAY
+        """Draw the animated player sprite based on movement state only."""
+        from src.sprite_system import sprite_manager, animation_manager
 
-        # Draw left half
-        pygame.draw.rect(surface, left_color, (self.x, self.y, half_size, self.size))
-        # Draw right half
-        pygame.draw.rect(
-            surface, right_color, (self.x + half_size, self.y, half_size, self.size)
-        )
+        # Determine animation state
+        if self.knockback_timer > 0:
+            pose = "jump"
+        elif self.is_jumping:
+            pose = "jump"
+        elif self._is_moving():
+            pose = "walk"
+        else:
+            pose = "idle"
+
+        # Animation key
+        name = "player2" if self.player_id == 2 else "player"
+        anim_key = f"{name}_{pose}"
+        # Register animation if not already
+        if anim_key not in animation_manager.animations:
+            frames = sprite_manager.animated_sprites[anim_key]
+            animation_manager.create_animation(anim_key, frames, frame_duration=6)
+        # Set animation state
+        animation_manager.set_animation_state(id(self), anim_key)
+        # Get current frame
+        frame = animation_manager.get_current_frame(id(self))
+        # Always use animated sprite, never fallback to block
+        if frame is not None:
+            if not self.facing_right:
+                frame = pygame.transform.flip(frame, True, False)
+            surface.blit(frame, (self.x, self.y))
+
+    def _is_moving(self):
+        # Simple check for movement (could be improved for diagonal)
+        keys = pygame.key.get_pressed()
+        if self.player_id == 1:
+            return keys[pygame.K_a] or keys[pygame.K_d] or keys[pygame.K_s]
+        else:
+            return keys[pygame.K_LEFT] or keys[pygame.K_RIGHT] or keys[pygame.K_DOWN]
 
 
 class Enemy(Entity):
+    def draw(self, surface):
+        """Draw the animated enemy sprite based on movement state only."""
+        from src.sprite_system import sprite_manager, animation_manager
+
+        # Determine animation state
+        if self.knockback_timer > 0:
+            pose = "attack"
+        elif self.velocity_y < 0:
+            pose = "attack"
+        elif abs(self.velocity_y) > 1:
+            pose = "walk"
+        else:
+            pose = "idle"
+
+        anim_key = f"enemy_{pose}"
+        if anim_key not in animation_manager.animations:
+            frames = sprite_manager.animated_sprites[anim_key]
+            animation_manager.create_animation(anim_key, frames, frame_duration=6)
+        animation_manager.set_animation_state(id(self), anim_key)
+        frame = animation_manager.get_current_frame(id(self))
+        # Always use animated sprite, never fallback to block
+        if frame is not None:
+            surface.blit(frame, (self.x, self.y))
+
     """Enemy AI entity with movement, jumping, and shooting capabilities."""
 
     def __init__(self, x, y):
@@ -379,8 +424,18 @@ class Bullet:
         self.rect.x = self.x
 
     def draw(self, surface):
-        """Draw the bullet on the given surface."""
-        pygame.draw.rect(surface, self.color, (self.x, self.y, self.width, self.height))
+        """Draw the bullet using enhanced sprite only."""
+        from src.sprite_system import sprite_manager
+
+        if self.owner_id == 1:
+            sprite = sprite_manager.get_sprite("player_bullet")
+        elif self.owner_id == 2:
+            sprite = sprite_manager.get_sprite("player2_bullet")
+        else:
+            sprite = sprite_manager.get_sprite("bullet")
+        # Always use enhanced sprite, never fallback to block
+        if sprite:
+            surface.blit(sprite, (self.x - 2, self.y - 1))
 
     def is_off_screen(self):
         """Check if bullet is off screen."""

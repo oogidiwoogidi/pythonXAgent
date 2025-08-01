@@ -91,7 +91,7 @@ class SpriteManager:
         ]
 
         # Weapons (static for now, could animate firing later)
-        self.animated_sprites["rifle"] = [self._create_rifle_sprite()]
+        self.animated_sprites["blaster"] = [self._create_blaster_sprite()]
         self.animated_sprites["pistol"] = [self._create_pistol_sprite()]
 
     def _create_player_sprite(
@@ -772,18 +772,21 @@ class SpriteManager:
 
         return surf
 
-    def _create_rifle_sprite(self):
-        """Create a rifle weapon sprite."""
+    def _create_blaster_sprite(self):
+        """Create a blaster weapon sprite with Star Wars styling."""
         surf = pygame.Surface((30, 8), pygame.SRCALPHA)
 
-        # Barrel
-        pygame.draw.rect(surf, (60, 60, 60), (0, 2, 25, 4))
+        # Barrel (more futuristic look)
+        pygame.draw.rect(surf, (80, 80, 120), (0, 2, 25, 4))
 
-        # Stock
-        pygame.draw.rect(surf, (80, 60, 40), (20, 0, 10, 8))
+        # Energy chamber
+        pygame.draw.rect(surf, (100, 100, 200), (20, 0, 10, 8))
 
-        # Trigger guard
-        pygame.draw.rect(surf, (60, 60, 60), (15, 3, 8, 2))
+        # Trigger guard (sleeker)
+        pygame.draw.rect(surf, (80, 80, 120), (15, 3, 8, 2))
+
+        # Energy glow effect
+        pygame.draw.rect(surf, (150, 150, 255), (1, 3, 2, 2))
 
         return surf
 
@@ -912,6 +915,234 @@ class SpriteManager:
     def rotate_sprite(self, sprite, angle):
         """Rotate a sprite by specified angle."""
         return pygame.transform.rotate(sprite, angle)
+
+    def _create_jedi_sprite(self, size, pose="idle", frame=0, facing_right=True):
+        """Create a Jedi sprite with lightsaber and robes."""
+        surf = pygame.Surface((size, size), pygame.SRCALPHA)
+
+        # Jedi body proportions
+        head_radius = size // 7
+        torso_width = size // 2.8
+        torso_height = size // 2.2
+
+        # Jedi head with hood
+        head_center = (size // 2, head_radius + 3)
+        pygame.draw.circle(
+            surf, (139, 69, 19), head_center, head_radius + 3
+        )  # Brown hood
+        pygame.draw.circle(surf, (220, 180, 140), head_center, head_radius - 1)  # Face
+
+        # Eyes (wise Jedi eyes)
+        eye_y = head_radius - 1
+        if facing_right:
+            pygame.draw.ellipse(surf, (255, 255, 255), (size // 2 - 4, eye_y, 5, 3))
+            pygame.draw.ellipse(surf, (255, 255, 255), (size // 2 + 3, eye_y, 5, 3))
+            pygame.draw.circle(
+                surf, (50, 150, 200), (size // 2 - 1, eye_y + 1), 1
+            )  # Blue eyes
+            pygame.draw.circle(surf, (50, 150, 200), (size // 2 + 6, eye_y + 1), 1)
+        else:
+            pygame.draw.ellipse(surf, (255, 255, 255), (size // 2 - 7, eye_y, 5, 3))
+            pygame.draw.ellipse(surf, (255, 255, 255), (size // 2, eye_y, 5, 3))
+            pygame.draw.circle(surf, (50, 150, 200), (size // 2 - 6, eye_y + 1), 1)
+            pygame.draw.circle(surf, (50, 150, 200), (size // 2 + 1, eye_y + 1), 1)
+
+        # Jedi robe (tan/brown)
+        torso_rect = pygame.Rect(
+            size // 2 - torso_width // 2,
+            head_radius * 2 + 5,
+            torso_width,
+            torso_height,
+        )
+        pygame.draw.rect(surf, (160, 130, 90), torso_rect)  # Tan robe
+        pygame.draw.rect(surf, (120, 90, 60), torso_rect, 2)  # Darker outline
+
+        # Jedi belt
+        belt_y = torso_rect.centery
+        pygame.draw.rect(surf, (101, 67, 33), (torso_rect.left, belt_y, torso_width, 3))
+
+        # Arms with Jedi sleeves
+        arm_width = size // 8
+        arm_length = size // 3
+        shoulder_y = head_radius * 2 + 8
+
+        left_arm = pygame.Rect(
+            size // 2 - torso_width // 2 - arm_width, shoulder_y, arm_width, arm_length
+        )
+        right_arm = pygame.Rect(
+            size // 2 + torso_width // 2, shoulder_y, arm_width, arm_length
+        )
+
+        pygame.draw.rect(surf, (160, 130, 90), left_arm)  # Tan robe sleeves
+        pygame.draw.rect(surf, (160, 130, 90), right_arm)
+
+        # Hands
+        pygame.draw.circle(
+            surf, (220, 180, 140), (left_arm.centerx, left_arm.bottom), 3
+        )
+        pygame.draw.circle(
+            surf, (220, 180, 140), (right_arm.centerx, right_arm.bottom), 3
+        )
+
+        # LIGHTSABER! (Blue blade)
+        if facing_right:
+            saber_x = right_arm.centerx + 2
+        else:
+            saber_x = left_arm.centerx - 2
+
+        saber_y = right_arm.bottom
+        # Lightsaber hilt
+        pygame.draw.rect(surf, (150, 150, 150), (saber_x - 1, saber_y, 3, 8))
+        # Blue lightsaber blade
+        pygame.draw.rect(surf, (100, 150, 255), (saber_x, saber_y - 15, 1, 15))
+        pygame.draw.rect(
+            surf, (150, 200, 255), (saber_x - 1, saber_y - 15, 3, 15), 1
+        )  # Glow
+
+        # Much longer legs for taller figure
+        leg_width = size // 10
+        leg_length = size // 1.3  # Much taller legs
+        legs_start_y = torso_rect.bottom
+
+        left_leg = pygame.Rect(
+            size // 2 - leg_width - 2, legs_start_y, leg_width, leg_length
+        )
+        right_leg = pygame.Rect(size // 2 + 2, legs_start_y, leg_width, leg_length)
+
+        pygame.draw.rect(surf, (160, 130, 90), left_leg)  # Tan robe legs
+        pygame.draw.rect(surf, (160, 130, 90), right_leg)
+
+        # Jedi boots
+        pygame.draw.rect(
+            surf, (101, 67, 33), (left_leg.left, left_leg.bottom - 5, leg_width, 5)
+        )
+        pygame.draw.rect(
+            surf, (101, 67, 33), (right_leg.left, right_leg.bottom - 5, leg_width, 5)
+        )
+
+        return surf
+
+    def _create_sith_sprite(self, size, pose="idle", frame=0, facing_right=True):
+        """Create a Sith Lord sprite with red lightsaber and dark robes."""
+        surf = pygame.Surface((size, size), pygame.SRCALPHA)
+
+        # Sith body proportions
+        head_radius = size // 7
+        torso_width = size // 2.8
+        torso_height = size // 2.2
+
+        # Sith head with dark hood
+        head_center = (size // 2, head_radius + 3)
+        pygame.draw.circle(
+            surf, (30, 30, 30), head_center, head_radius + 3
+        )  # Black hood
+        pygame.draw.circle(
+            surf, (200, 160, 120), head_center, head_radius - 1
+        )  # Pale face
+
+        # Eyes (menacing Sith eyes)
+        eye_y = head_radius - 1
+        if facing_right:
+            pygame.draw.ellipse(surf, (255, 255, 255), (size // 2 - 4, eye_y, 5, 3))
+            pygame.draw.ellipse(surf, (255, 255, 255), (size // 2 + 3, eye_y, 5, 3))
+            pygame.draw.circle(
+                surf, (255, 200, 0), (size // 2 - 1, eye_y + 1), 1
+            )  # Yellow Sith eyes
+            pygame.draw.circle(surf, (255, 200, 0), (size // 2 + 6, eye_y + 1), 1)
+        else:
+            pygame.draw.ellipse(surf, (255, 255, 255), (size // 2 - 7, eye_y, 5, 3))
+            pygame.draw.ellipse(surf, (255, 255, 255), (size // 2, eye_y, 5, 3))
+            pygame.draw.circle(surf, (255, 200, 0), (size // 2 - 6, eye_y + 1), 1)
+            pygame.draw.circle(surf, (255, 200, 0), (size // 2 + 1, eye_y + 1), 1)
+
+        # Dark Sith robe
+        torso_rect = pygame.Rect(
+            size // 2 - torso_width // 2,
+            head_radius * 2 + 5,
+            torso_width,
+            torso_height,
+        )
+        pygame.draw.rect(surf, (40, 40, 40), torso_rect)  # Dark robe
+        pygame.draw.rect(surf, (20, 20, 20), torso_rect, 2)  # Darker outline
+
+        # Sith belt
+        belt_y = torso_rect.centery
+        pygame.draw.rect(surf, (60, 60, 60), (torso_rect.left, belt_y, torso_width, 3))
+
+        # Arms with dark sleeves
+        arm_width = size // 8
+        arm_length = size // 3
+        shoulder_y = head_radius * 2 + 8
+
+        left_arm = pygame.Rect(
+            size // 2 - torso_width // 2 - arm_width, shoulder_y, arm_width, arm_length
+        )
+        right_arm = pygame.Rect(
+            size // 2 + torso_width // 2, shoulder_y, arm_width, arm_length
+        )
+
+        pygame.draw.rect(surf, (40, 40, 40), left_arm)  # Dark robe sleeves
+        pygame.draw.rect(surf, (40, 40, 40), right_arm)
+
+        # Hands
+        pygame.draw.circle(
+            surf, (200, 160, 120), (left_arm.centerx, left_arm.bottom), 3
+        )
+        pygame.draw.circle(
+            surf, (200, 160, 120), (right_arm.centerx, right_arm.bottom), 3
+        )
+
+        # RED LIGHTSABER! (Sith weapon)
+        if facing_right:
+            saber_x = right_arm.centerx + 2
+        else:
+            saber_x = left_arm.centerx - 2
+
+        saber_y = right_arm.bottom
+        # Lightsaber hilt (more angular/menacing)
+        pygame.draw.rect(surf, (80, 80, 80), (saber_x - 1, saber_y, 3, 8))
+        # Red lightsaber blade
+        pygame.draw.rect(surf, (255, 50, 50), (saber_x, saber_y - 15, 1, 15))
+        pygame.draw.rect(
+            surf, (255, 100, 100), (saber_x - 1, saber_y - 15, 3, 15), 1
+        )  # Red glow
+
+        # Much longer legs for taller figure
+        leg_width = size // 10
+        leg_length = size // 1.3  # Much taller legs
+        legs_start_y = torso_rect.bottom
+
+        left_leg = pygame.Rect(
+            size // 2 - leg_width - 2, legs_start_y, leg_width, leg_length
+        )
+        right_leg = pygame.Rect(size // 2 + 2, legs_start_y, leg_width, leg_length)
+
+        pygame.draw.rect(surf, (40, 40, 40), left_leg)  # Dark robe legs
+        pygame.draw.rect(surf, (40, 40, 40), right_leg)
+
+        # Dark boots
+        pygame.draw.rect(
+            surf, (20, 20, 20), (left_leg.left, left_leg.bottom - 5, leg_width, 5)
+        )
+        pygame.draw.rect(
+            surf, (20, 20, 20), (right_leg.left, right_leg.bottom - 5, leg_width, 5)
+        )
+
+        return surf
+
+    def get_character_sprite(
+        self, character_type, size, pose="idle", frame=0, facing_right=True
+    ):
+        """Get a sprite based on character type (jedi, sith, or soldier)."""
+        if character_type == "jedi":
+            return self._create_jedi_sprite(size, pose, frame, facing_right)
+        elif character_type == "sith":
+            return self._create_sith_sprite(size, pose, frame, facing_right)
+        else:
+            # Default to soldier
+            return self._create_player_sprite(
+                size, PLAYER_COLOR, pose, frame, facing_right
+            )
 
 
 class AnimationManager:

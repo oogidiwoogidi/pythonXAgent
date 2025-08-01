@@ -15,23 +15,33 @@ class SoundManager:
         self._load_sounds()
 
     def _load_sounds(self):
-        # Add your .wav files to the assets folder
+        # Look for sound files in the assets/sounds folder
+        sounds_path = os.path.join(self.assets_path, "sounds")
         sound_files = {
             "jump": "jump.wav",
-            "shoot": "shoot.wav",
+            "shoot": "shoot.mp3",
             "damage": "damage.wav",
             "game_over": "game_over.wav",
         }
         for key, filename in sound_files.items():
-            path = os.path.join(self.assets_path, filename)
+            path = os.path.join(sounds_path, filename)
             if os.path.exists(path):
                 self.sounds[key] = pygame.mixer.Sound(path)
+                # Set much quieter volume for gunshot sound
+                if key == "shoot":
+                    self.sounds[key].set_volume(
+                        0.2
+                    )  # 20% volume for very quiet gunshots
+                print(f"Loaded sound: {key} from {path}")
             else:
                 self.sounds[key] = None  # Placeholder if file is missing
+                print(f"Sound file not found: {path}")
 
-    def play(self, sound_key):
+    def play(self, sound_key, volume=None):
         sound = self.sounds.get(sound_key)
         if sound:
+            if volume is not None:
+                sound.set_volume(volume)
             sound.play()
 
 

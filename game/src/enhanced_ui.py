@@ -286,7 +286,7 @@ class EnhancedUI:
     def draw_mini_map(self, screen, players, enemies, platforms):
         """Draw a mini-map in the corner."""
         map_size = 120
-        map_x = WINDOW_WIDTH - map_size - 10
+        map_x = (WINDOW_WIDTH - map_size) // 2  # Center horizontally
         map_y = 10
 
         # Map background

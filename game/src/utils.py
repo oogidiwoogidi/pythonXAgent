@@ -74,7 +74,7 @@ def draw_labeled_health_bar(surface, x, y, health, max_health, label):
     draw_health_bar(surface, x, y, health, max_health)
     font_label = pygame.font.SysFont(None, UI_LABEL_FONT_SIZE)
     text = f"{label}: {health}/{max_health}"
-    text_surface = font_label.render(text, True, BLACK)
+    text_surface = font_label.render(text, True, WHITE)
     surface.blit(text_surface, (x, y - 18))
 
 
@@ -226,8 +226,7 @@ def draw_weapon_info(surface, player, x_offset, y_offset):
     font_reload = pygame.font.SysFont(None, UI_RELOAD_FONT_SIZE)
 
     # Draw weapon type
-    weapon_name = "Rifle" if player.weapon == WEAPON_RIFLE else "Shotgun"
-    weapon_text = font_reload.render(f"Weapon: {weapon_name}", True, BLACK)
+    weapon_text = font_reload.render("Weapon: Blaster", True, WHITE)
     surface.blit(weapon_text, (player.x + x_offset, player.y + y_offset - 60))
 
     # Draw reloading status or ammo count
@@ -235,5 +234,5 @@ def draw_weapon_info(surface, player, x_offset, y_offset):
         reload_text = font_reload.render("Reloading...", True, DARK_RED)
         surface.blit(reload_text, (player.x + x_offset, player.y + y_offset - 32))
     else:
-        mag_text = font_reload.render(f"Ammo: {player.magazine}", True, BLACK)
+        mag_text = font_reload.render(f"Ammo: {player.magazine}", True, WHITE)
         surface.blit(mag_text, (player.x + x_offset, player.y + y_offset - 32))

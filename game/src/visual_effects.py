@@ -90,16 +90,77 @@ class ParticleSystem:
             )
 
     def add_muzzle_flash(self, x, y, direction, color=(255, 255, 150)):
-        """Add muzzle flash effect."""
-        for _ in range(8):
-            angle = direction + random.uniform(-0.5, 0.5)
-            speed = random.uniform(3, 6)
+        """Add EXPLOSIVE muzzle flash effect to match the BOOM sound."""
+        # MASSIVE main flash burst - much bigger and more intense
+        for _ in range(20):  # Increased from 12
+            angle = direction + random.uniform(-1.2, 1.2)  # Wider spread
+            speed = random.uniform(8, 18)  # Much faster
             velocity_x = math.cos(angle) * speed
             velocity_y = math.sin(angle) * speed
-            life = random.randint(8, 15)
-            size = random.randint(1, 3)
+            life = random.randint(12, 25)  # Longer lasting
+            size = random.randint(4, 8)  # Much bigger particles
+
+            # EXPLOSIVE flash colors - brighter and more intense
+            flash_colors = [
+                (255, 255, 255),  # Pure white explosion
+                (255, 255, 150),  # Bright white-yellow
+                (255, 220, 100),  # Intense yellow
+                (255, 180, 80),  # Orange-yellow
+                (255, 255, 200),  # Bright flash
+            ]
+            flash_color = random.choice(flash_colors)
+
             self.particles.append(
-                Particle(x, y, velocity_x, velocity_y, color, life, size)
+                Particle(x, y, velocity_x, velocity_y, flash_color, life, size)
+            )
+
+        # EXPLOSIVE sparks - more numerous and faster
+        for _ in range(15):  # Increased from 8
+            angle = random.uniform(0, 2 * math.pi)
+            speed = random.uniform(12, 20)  # Much faster sparks
+            velocity_x = math.cos(angle) * speed
+            velocity_y = math.sin(angle) * speed
+            life = random.randint(8, 18)  # Longer lasting
+            size = random.randint(2, 4)  # Bigger sparks
+
+            # EXPLOSIVE spark colors - brighter and more varied
+            spark_colors = [
+                (255, 150, 0),  # Bright orange
+                (255, 100, 0),  # Orange-red
+                (255, 200, 50),  # Yellow-orange
+                (255, 80, 0),  # Deep orange
+                (255, 255, 100),  # Bright yellow
+            ]
+            spark_color = random.choice(spark_colors)
+
+            self.particles.append(
+                Particle(x, y, velocity_x, velocity_y, spark_color, life, size)
+            )
+            spark_color = random.choice(spark_colors)
+
+            self.particles.append(
+                Particle(x, y, velocity_x, velocity_y, spark_color, life, size)
+            )
+
+        # Add smoke particles for realism
+        for _ in range(6):
+            angle = direction + random.uniform(-0.5, 0.5)
+            speed = random.uniform(1, 3)
+            velocity_x = math.cos(angle) * speed
+            velocity_y = math.sin(angle) * speed - 1  # Slight upward drift
+            life = random.randint(20, 35)
+            size = random.randint(2, 4)
+
+            # Smoke colors (grays)
+            smoke_colors = [
+                (100, 100, 100),  # Dark gray
+                (150, 150, 150),  # Medium gray
+                (80, 80, 80),  # Darker gray
+            ]
+            smoke_color = random.choice(smoke_colors)
+
+            self.particles.append(
+                Particle(x, y, velocity_x, velocity_y, smoke_color, life, size)
             )
 
     def add_blood_splatter(self, x, y, color=(150, 0, 0)):

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Game Launcher
+2D Platform Shooter Launcher
 
-A simple launcher to select and run different games.
+Simple launcher for the 2D Platform Shooter game.
 """
 
 import pygame
@@ -26,7 +26,7 @@ GRAY = (128, 128, 128)
 
 # Set up the display
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-pygame.display.set_caption("Game Launcher")
+pygame.display.set_caption("2D Platform Shooter")
 
 clock = pygame.time.Clock()
 font_title = pygame.font.SysFont(None, 48)
@@ -47,12 +47,12 @@ def draw_button(surface, text, x, y, width, height, color=LIGHT_BLUE):
     return button_rect
 
 
-def run_game(game_script):
-    """Run a game script."""
+def run_game():
+    """Run the platform shooter game."""
     try:
         # Get the directory of this launcher script
         launcher_dir = os.path.dirname(os.path.abspath(__file__))
-        game_path = os.path.join(launcher_dir, game_script)
+        game_path = os.path.join(launcher_dir, "main.py")
 
         if os.path.exists(game_path):
             # Close the launcher
@@ -73,7 +73,7 @@ def main():
     """Main launcher loop."""
     pygame.init()
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-    pygame.display.set_caption("Game Launcher")
+    pygame.display.set_caption("2D Platform Shooter")
 
     running = True
 
@@ -87,10 +87,8 @@ def main():
                 mouse_pos = pygame.mouse.get_pos()
 
                 # Check button clicks
-                if shooter_button.collidepoint(mouse_pos):
-                    run_game("main.py")
-                elif flappy_button.collidepoint(mouse_pos):
-                    run_game("flappy_bird.py")
+                if start_button.collidepoint(mouse_pos):
+                    run_game()
                 elif quit_button.collidepoint(mouse_pos):
                     running = False
 
@@ -98,12 +96,12 @@ def main():
         screen.fill(WHITE)
 
         # Draw title
-        title_text = font_title.render("Game Launcher", True, BLACK)
+        title_text = font_title.render("2D Platform Shooter", True, BLACK)
         title_x = (SCREEN_WIDTH - title_text.get_width()) // 2
         screen.blit(title_text, (title_x, 50))
 
         # Draw subtitle
-        subtitle_text = font_button.render("Choose a game to play:", True, GRAY)
+        subtitle_text = font_button.render("Fast-paced action platformer", True, GRAY)
         subtitle_x = (SCREEN_WIDTH - subtitle_text.get_width()) // 2
         screen.blit(subtitle_text, (subtitle_x, 100))
 
@@ -112,23 +110,21 @@ def main():
         button_height = 50
         button_x = (SCREEN_WIDTH - button_width) // 2
 
-        shooter_button = draw_button(
-            screen, "2D Platform Shooter", button_x, 150, button_width, button_height
-        )
-
-        flappy_button = draw_button(
-            screen, "Flappy Bird", button_x, 220, button_width, button_height
+        start_button = draw_button(
+            screen, "Start Game", button_x, 180, button_width, button_height
         )
 
         quit_button = draw_button(
-            screen, "Quit", button_x, 290, button_width, button_height, GRAY
+            screen, "Quit", button_x, 250, button_width, button_height, GRAY
         )
 
         # Draw instructions
         instructions = [
             "Controls:",
-            "• Platform Shooter: WASD + Space + Mouse",
-            "• Flappy Bird: Spacebar to flap",
+            "• WASD keys to move",
+            "• Space to jump",
+            "• Mouse to aim and shoot",
+            "• 1/2 keys to switch weapons",
         ]
 
         for i, instruction in enumerate(instructions):
@@ -138,7 +134,7 @@ def main():
                 if i == 0
                 else pygame.font.SysFont(None, 24).render(instruction, True, color)
             )
-            screen.blit(text, (20, 350 + i * 20))
+            screen.blit(text, (20, 320 + i * 25))
 
         pygame.display.flip()
         clock.tick(60)

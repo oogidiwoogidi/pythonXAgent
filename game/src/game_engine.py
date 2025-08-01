@@ -66,7 +66,6 @@ class GameEngine:
         self.player2 = None
         self.enemy = None
         self.bullets = []
-        # Removed: self.grenades = []
 
         # Game systems
         self.menu_manager = MenuManager(self.game_surface, self)
@@ -81,17 +80,42 @@ class GameEngine:
         self.enemy_exploded = False
 
     def run(self):
-        """Main game loop with enhanced menu system."""
+        """Main game loop with enhanced menu system and Star Wars character selection."""
         while self.running:
+            # Reset game state before showing menu
+            self._reset_game_state()
+
             # Show start menu and get game mode
-            self.two_player_mode, self.difficulty = (
-                self.menu_manager.show_start_and_difficulty_menu()
-            )
+            result = self.menu_manager.show_start_and_difficulty_menu()
+
+            if result is None:
+                continue  # User quit, restart menu
+
+            self.two_player_mode, self.difficulty = result
+
+            # Set default difficulty for two-player mode (not used but needed for consistency)
+            if self.two_player_mode and self.difficulty is None:
+                self.difficulty = "Medium"
+
+            # Character selection based on game mode
+            if self.two_player_mode:
+                # Two player mode: character selection only
+                character_selections = self.menu_manager.show_character_selection("two")
+            else:
+                # Single player mode: dedicated character selection page after difficulty
+                character_selections = (
+                    self.menu_manager.show_single_player_character_selection()
+                )
+
+            if character_selections is None:
+                continue  # User quit during character selection, return to menu
+
+            self.character_selections = character_selections
 
             # Game session loop - allows for rematch without returning to menu
             session_running = True
             while session_running and self.running:
-                # Initialize game
+                # Initialize game with character selections
                 self._initialize_game()
 
                 # Run game loop
@@ -103,9 +127,32 @@ class GameEngine:
                 elif game_result == "quit":
                     self.running = False  # Exit game completely
                 elif game_result == "rematch":
-                    continue  # Restart with same settings
+                    continue  # Restart with same settings and characters
                 else:
                     session_running = False  # Default: return to menu
+
+    def _reset_game_state(self):
+        """Reset game state to prepare for new menu session."""
+        # Clear pygame event queue to prevent stuck events
+        pygame.event.clear()
+
+        # Reset game entities
+        self.player1 = None
+        self.player2 = None
+        self.enemy = None
+        self.bullets = []
+
+        # Reset explosion tracking
+        self.player1_exploded = False
+        self.player2_exploded = False
+        self.enemy_exploded = False
+
+        # Reset enemy shooting system
+        self.bullet_timer = 0
+        self.bullet_interval = random.randint(40, 120)
+
+        # Clear platforms
+        self.platforms = []
 
     def _calculate_scaling(self):
         """Calculate scaling factors and positioning for fullscreen mode."""
@@ -175,33 +222,40 @@ class GameEngine:
             )
 
     def _initialize_game(self):
-        """Initialize game entities and state."""
+        """Initialize game entities and state with character selections."""
         # Generate platforms
         self.platforms = generate_random_platforms()
 
-        # Create players
+        # Create players with character types
         if self.two_player_mode:
             self.player1 = Player(
                 WINDOW_WIDTH // 8 - PLAYER_SIZE // 2,
                 WINDOW_HEIGHT // 2 - PLAYER_SIZE // 2,
                 1,
+                self.character_selections["player1"],
             )
             self.player2 = Player(
                 7 * WINDOW_WIDTH // 8 - PLAYER2_SIZE // 2,
                 WINDOW_HEIGHT // 2 - PLAYER2_SIZE // 2,
                 2,
+                self.character_selections["player2"],
             )
             self.enemy = None
         else:
+            # Single player mode
             self.player1 = Player(
                 WINDOW_WIDTH // 2 - PLAYER_SIZE // 2,
                 WINDOW_HEIGHT // 2 - PLAYER_SIZE // 2,
                 1,
+                self.character_selections["player1"],
             )
             self.player2 = None
+            # AI gets the opposite character type
+            ai_character = self.character_selections["ai"]
             self.enemy = Enemy(
                 WINDOW_WIDTH // 4 - ENEMY_SIZE // 2,
                 WINDOW_HEIGHT // 2 - ENEMY_SIZE // 2,
+                ai_character,
             )
 
         # Reset game state
@@ -242,20 +296,20 @@ class GameEngine:
 
                     # Weapon switching
                     if event.key == pygame.K_1:
-                        self.player1.switch_weapon(WEAPON_RIFLE)
+                        self.player1.switch_weapon(WEAPON_BLASTER)
                         enhanced_ui.add_floating_text(
                             self.player1.x,
                             self.player1.y - 30,
-                            "RIFLE EQUIPPED",
+                            "BLASTER EQUIPPED",
                             GREEN,
                             20,
                         )
                         if self.two_player_mode and self.player2:
-                            self.player2.switch_weapon(WEAPON_RIFLE)
+                            self.player2.switch_weapon(WEAPON_BLASTER)
                             enhanced_ui.add_floating_text(
                                 self.player2.x,
                                 self.player2.y - 30,
-                                "RIFLE EQUIPPED",
+                                "BLASTER EQUIPPED",
                                 BLUE,
                                 20,
                             )
@@ -303,7 +357,12 @@ class GameEngine:
                                     self.player1.y + self.player1.size // 2,
                                     angle,
                                 )
-                                screen_effects.add_screen_shake(2, 5)
+                                screen_effects.add_screen_shake(
+                                    8, 15
+                                )  # Much more intense shake
+                                screen_effects.add_screen_flash(
+                                    (255, 255, 255), 120, 6
+                                )  # Brighter, longer flash
                                 self.sound_manager.play("shoot")
 
                         if event.key == pygame.K_KP0 and self.player2.is_alive():
@@ -316,11 +375,13 @@ class GameEngine:
                                     self.player2.y + self.player2.size // 2,
                                     0,  # Facing right by default
                                 )
-                                screen_effects.add_screen_shake(2, 5)
+                                screen_effects.add_screen_shake(
+                                    8, 15
+                                )  # Much more intense shake
+                                screen_effects.add_screen_flash(
+                                    (255, 255, 255), 120, 6
+                                )  # Brighter, longer flash
                                 self.sound_manager.play("shoot")
-
-                    # Grenade throw
-                    # Removed grenade throw logic for 'Q'
 
                 # Shooting (mouse for single player)
                 if not self.two_player_mode and event.type == pygame.MOUSEBUTTONDOWN:
@@ -329,8 +390,28 @@ class GameEngine:
                         # Set facing direction based on mouse position
                         self.player1.facing_right = mouse_x > self.player1.x
                         new_bullets = self.player1.shoot()
-                        self.bullets.extend(new_bullets)
-                        self.sound_manager.play("shoot")
+                        if new_bullets:
+                            self.bullets.extend(new_bullets)
+                            # Calculate angle towards mouse for muzzle flash
+                            import math
+
+                            dx = mouse_x - (self.player1.x + self.player1.size // 2)
+                            dy = mouse_y - (self.player1.y + self.player1.size // 2)
+                            angle = math.atan2(dy, dx)
+
+                            # Add muzzle flash effect
+                            particle_system.add_muzzle_flash(
+                                self.player1.x + self.player1.size // 2,
+                                self.player1.y + self.player1.size // 2,
+                                angle,
+                            )
+                            screen_effects.add_screen_shake(
+                                8, 15
+                            )  # Much more intense shake
+                            screen_effects.add_screen_flash(
+                                (255, 255, 255), 120, 6
+                            )  # Brighter, longer flash
+                            self.sound_manager.play("shoot")
 
             # Update entities
             keys = pygame.key.get_pressed()
@@ -362,14 +443,31 @@ class GameEngine:
                         )
                         self.bullets.append(enemy_bullet)
 
+                        # Add muzzle flash for enemy shooting
+                        import math
+
+                        dx = self.player1.x - self.enemy.x
+                        dy = self.player1.y - self.enemy.y
+                        angle = math.atan2(dy, dx)
+
+                        particle_system.add_muzzle_flash(
+                            self.enemy.x + self.enemy.size // 2,
+                            self.enemy.y + self.enemy.size // 2,
+                            angle,
+                        )
+                        screen_effects.add_screen_shake(
+                            6, 10
+                        )  # Intense but slightly less than players
+                        screen_effects.add_screen_flash(
+                            (255, 255, 200), 80, 4
+                        )  # Enemy flash
+                        self.sound_manager.play("shoot")
+
             # Update bullets
             for bullet in self.bullets[:]:
                 bullet.update()
                 if bullet.is_off_screen():
                     self.bullets.remove(bullet)
-
-            # Update grenades
-            # Removed grenade update and explosion logic
 
             # Handle collisions
             self._handle_collisions()

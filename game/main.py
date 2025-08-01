@@ -29,17 +29,22 @@ def main():
         except Exception as mixer_error:
             print(f"Failed to initialize mixer: {mixer_error}")
 
-        # Load background music
-        music_path = r"C:\Users\Elyas\Downloads\Dark Tension Suspense Cinematic NoCopyright Background Music 1 Hour by Soundridemusic.mp3"
+        # Load Imperial March background music
+        music_path = os.path.join(
+            os.path.dirname(__file__), "assets", "music", "imperial_march.mp3"
+        )
         if os.path.exists(music_path):
             try:
                 pygame.mixer.music.load(music_path)
+                pygame.mixer.music.set_volume(
+                    1.0
+                )  # Set volume to 100% - MAXIMUM Imperial March power!
                 pygame.mixer.music.play(-1)  # Loop forever
-                print("Background music started.")
+                print("Imperial March music started! ⚔️ The Empire Strikes Back! ⚔️")
             except Exception as music_error:
-                print(f"Failed to play music: {music_error}")
+                print(f"Failed to play Imperial March: {music_error}")
         else:
-            print(f"Background music file not found: {music_path}")
+            print("Imperial March music file not found")
 
         # Initialize the game engine
         game = GameEngine()
@@ -58,4 +63,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-    sys.exit()

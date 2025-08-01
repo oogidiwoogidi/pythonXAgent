@@ -37,8 +37,8 @@ class Entity:
 class Player(Entity):
     """Player entity with movement, jumping, and combat capabilities."""
 
-    def __init__(self, x, y, player_id=1):
-        """Initialize a player."""
+    def __init__(self, x, y, player_id=1, character_type="soldier"):
+        """Initialize a player with character type (jedi, sith, or soldier)."""
         if player_id == 1:
             super().__init__(x, y, PLAYER_SIZE, PLAYER_COLOR)
             self.max_health = PLAYER_MAX_HEALTH
@@ -49,15 +49,16 @@ class Player(Entity):
             self.speed = PLAYER2_SPEED
 
         self.player_id = player_id
+        self.character_type = character_type  # 'jedi', 'sith', or 'soldier'
         self.health = self.max_health
         self.facing_right = True
 
         # Weapon system
-        self.weapon = WEAPON_RIFLE
+        self.weapon = WEAPON_BLASTER
         self.magazine = MAGAZINE_SIZE
         self.reloading = False
         self.reload_timer = 0
-        self.rifle_cooldown = 0
+        self.blaster_cooldown = 0
 
         # Knockback system
         self.knockback_timer = 0
@@ -75,8 +76,8 @@ class Player(Entity):
                 self.reload_timer = 0
 
         # Handle weapon cooldowns
-        if self.rifle_cooldown > 0:
-            self.rifle_cooldown -= 1
+        if self.blaster_cooldown > 0:
+            self.blaster_cooldown -= 1
 
         # Handle knockback
         if self.knockback_timer > 0:
@@ -166,8 +167,8 @@ class Player(Entity):
         """Shoot a bullet based on the current weapon."""
         bullets = []
 
-        if self.weapon == WEAPON_RIFLE:
-            if not self.reloading and self.magazine > 0 and self.rifle_cooldown == 0:
+        if self.weapon == WEAPON_BLASTER:
+            if not self.reloading and self.magazine > 0 and self.blaster_cooldown == 0:
                 direction = 1 if self.facing_right else -1
                 bullet = Bullet(
                     self.x + self.size // 2,
@@ -182,7 +183,7 @@ class Player(Entity):
                 )
                 bullets.append(bullet)
                 self.magazine -= 1
-                self.rifle_cooldown = RIFLE_COOLDOWN_FRAMES
+                self.blaster_cooldown = BLASTER_COOLDOWN_FRAMES
 
                 if self.magazine == 0:
                     self.reloading = True
@@ -191,9 +192,9 @@ class Player(Entity):
         return bullets
 
     def switch_weapon(self, key):
-        """Switch to rifle only (shotgun removed)."""
+        """Switch to blaster only (shotgun removed)."""
         if key == pygame.K_1 or key == pygame.K_KP1:
-            self.weapon = WEAPON_RIFLE
+            self.weapon = WEAPON_BLASTER
 
     def take_damage(self, damage, bullet_direction):
         """Take damage and apply knockback."""
@@ -211,7 +212,7 @@ class Player(Entity):
         return self.health > 0
 
     def draw(self, surface):
-        """Draw the animated player sprite based on movement state only."""
+        """Draw the animated player sprite based on movement state and character type."""
         from src.sprite_system import sprite_manager, animation_manager
 
         # Determine animation state
@@ -224,22 +225,30 @@ class Player(Entity):
         else:
             pose = "idle"
 
-        # Animation key
-        name = "player2" if self.player_id == 2 else "player"
-        anim_key = f"{name}_{pose}"
-        # Register animation if not already
-        if anim_key not in animation_manager.animations:
-            frames = sprite_manager.animated_sprites[anim_key]
-            animation_manager.create_animation(anim_key, frames, frame_duration=6)
-        # Set animation state
-        animation_manager.set_animation_state(id(self), anim_key)
-        # Get current frame
-        frame = animation_manager.get_current_frame(id(self))
-        # Always use animated sprite, never fallback to block
-        if frame is not None:
-            if not self.facing_right:
-                frame = pygame.transform.flip(frame, True, False)
-            surface.blit(frame, (self.x, self.y))
+        # Get character-specific sprite
+        if self.character_type in ["jedi", "sith"]:
+            # Use Star Wars character sprites
+            sprite = sprite_manager.get_character_sprite(
+                self.character_type, self.size, pose, 0, self.facing_right
+            )
+            surface.blit(sprite, (self.x, self.y))
+        else:
+            # Use default soldier animation system for regular soldiers
+            name = "player2" if self.player_id == 2 else "player"
+            anim_key = f"{name}_{pose}"
+            # Register animation if not already
+            if anim_key not in animation_manager.animations:
+                frames = sprite_manager.animated_sprites[anim_key]
+                animation_manager.create_animation(anim_key, frames, frame_duration=6)
+            # Set animation state
+            animation_manager.set_animation_state(id(self), anim_key)
+            # Get current frame
+            frame = animation_manager.get_current_frame(id(self))
+            # Always use animated sprite, never fallback to block
+            if frame is not None:
+                if not self.facing_right:
+                    frame = pygame.transform.flip(frame, True, False)
+                surface.blit(frame, (self.x, self.y))
 
     def _is_moving(self):
         # Simple check for movement (could be improved for diagonal)
@@ -251,8 +260,26 @@ class Player(Entity):
 
 
 class Enemy(Entity):
+    """Enemy AI entity with movement, jumping, and shooting capabilities."""
+
+    def __init__(self, x, y, character_type="soldier"):
+        """Initialize an enemy with character type."""
+        super().__init__(x, y, ENEMY_SIZE, ENEMY_COLOR)
+        self.health = ENEMY_MAX_HEALTH
+        self.max_health = ENEMY_MAX_HEALTH
+        self.character_type = character_type  # 'jedi', 'sith', or 'soldier'
+
+        # AI behavior
+        self.jump_timer = 0
+        self.jump_interval = 120
+
+        # Knockback system
+        self.knockback_timer = 0
+        self.knockback_dx = 0
+        self.knockback_dy = 0
+
     def draw(self, surface):
-        """Draw the animated enemy sprite based on movement state only."""
+        """Draw the animated enemy sprite based on movement state and character type."""
         from src.sprite_system import sprite_manager, animation_manager
 
         # Determine animation state
@@ -265,32 +292,28 @@ class Enemy(Entity):
         else:
             pose = "idle"
 
-        anim_key = f"enemy_{pose}"
-        if anim_key not in animation_manager.animations:
-            frames = sprite_manager.animated_sprites[anim_key]
-            animation_manager.create_animation(anim_key, frames, frame_duration=6)
-        animation_manager.set_animation_state(id(self), anim_key)
-        frame = animation_manager.get_current_frame(id(self))
-        # Always use animated sprite, never fallback to block
-        if frame is not None:
-            surface.blit(frame, (self.x, self.y))
-
-    """Enemy AI entity with movement, jumping, and shooting capabilities."""
-
-    def __init__(self, x, y):
-        """Initialize an enemy."""
-        super().__init__(x, y, ENEMY_SIZE, ENEMY_COLOR)
-        self.health = ENEMY_MAX_HEALTH
-        self.max_health = ENEMY_MAX_HEALTH
-
-        # AI behavior
-        self.jump_timer = 0
-        self.jump_interval = 120
-
-        # Knockback system
-        self.knockback_timer = 0
-        self.knockback_dx = 0
-        self.knockback_dy = 0
+        # Get character-specific sprite
+        if self.character_type in ["jedi", "sith"]:
+            # Use Star Wars character sprites
+            sprite = sprite_manager.get_character_sprite(
+                self.character_type,
+                self.size,
+                pose,
+                0,
+                True,  # Always face right for enemies
+            )
+            surface.blit(sprite, (self.x, self.y))
+        else:
+            # Use default enemy animation system for regular soldiers
+            anim_key = f"enemy_{pose}"
+            if anim_key not in animation_manager.animations:
+                frames = sprite_manager.animated_sprites[anim_key]
+                animation_manager.create_animation(anim_key, frames, frame_duration=6)
+            animation_manager.set_animation_state(id(self), anim_key)
+            frame = animation_manager.get_current_frame(id(self))
+            # Always use animated sprite, never fallback to block
+            if frame is not None:
+                surface.blit(frame, (self.x, self.y))
 
     def update(self, player, platforms, difficulty):
         """Update enemy AI behavior."""
@@ -391,13 +414,12 @@ class Enemy(Entity):
 class Bullet:
     """Bullet projectile class."""
 
-    def __init__(self, x, y, dx, owner_id, is_shotgun=False):
+    def __init__(self, x, y, dx, owner_id):
         """Initialize a bullet."""
         self.x = x
         self.y = y
         self.dx = dx
         self.owner_id = owner_id  # 1 for player1, 2 for player2, 0 for enemy
-        self.is_shotgun = is_shotgun
 
         # Set bullet properties based on owner
         if owner_id == 1:
